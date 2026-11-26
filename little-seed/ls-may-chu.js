@@ -9,7 +9,7 @@
      Máy mới mở link ?con=MÃ (hoặc ba mẹ nhập mã) → web lấy bản trên máy chủ về, gộp với bản trên máy (không bỏ ngày nào
      con đã học) rồi học tiếp. Máy chủ giữ số phiên bản: máy nào gửi bản cũ hơn sẽ được trả bản mới để gộp rồi gửi lại.
    ===================================================================== */
-const SDL_API = 'https://script.google.com/macros/s/AKfycbxGmqsyBcA-NxzE50aJEx5ZOEYxnxcoROthFs_6utXPtpfNhRqHaq89Ry3urcGLWdfKhw/exec';
+const SDL_API = 'https://script.google.com/macros/s/AKfycbxA0_S8xQRc9IpzVcQ06-waH5OT7H5crqr-yFTwmKUij09zf9qPbzRsiX-iCPHnnocz/exec';
 const API_ON = !!SDL_API;
 const LOP = 'ls', KEY = 'lsd';
 

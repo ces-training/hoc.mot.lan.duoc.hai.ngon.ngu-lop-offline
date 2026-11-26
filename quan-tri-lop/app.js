@@ -4,7 +4,7 @@
    - ?demo=1: chạy với dữ liệu giả lưu trên máy này (PIN 2468) để xem thử, không cần máy chủ.
    - Máy chủ cũ (bản 3): vẫn xem được dashboard và sao/quà; điểm danh, ghi chú, tài nguyên cần bản 4.
    ===================================================================== */
-const API = 'https://script.google.com/macros/s/AKfycbxGmqsyBcA-NxzE50aJEx5ZOEYxnxcoROthFs_6utXPtpfNhRqHaq89Ry3urcGLWdfKhw/exec';
+const API = 'https://script.google.com/macros/s/AKfycbxA0_S8xQRc9IpzVcQ06-waH5OT7H5crqr-yFTwmKUij09zf9qPbzRsiX-iCPHnnocz/exec';
 const DEMO = /[?&]demo=1/.test(location.search);
 const LOPS = { ls: { ten: 'Little Seed', web: '../little-seed/', tong: 99 }, sd: { ten: 'Seedling', web: '../seedling/', tong: 99 } };
 const LOAI = { tien_bo: '🌱 Tiến bộ', ho_tro: '🤝 Cần hỗ trợ', phu_huynh: '👪 Phụ huynh', hanh_vi: '🧭 Nề nếp', khac: '📝 Khác' };
@@ -110,14 +110,14 @@ function draw() {
   shell();
   const m = $('#main'); const f = { tq: vTq, hs: vHs, dd: vDd, tk: vTk, sq: vSq, tn: vTn }[S.tab] || vTq;
   m.innerHTML = f();
-  document.title = (LOPS[S.lop].ten) + ' · Quản trị lớp offline';
+  document.title = (LOPS[S.lop].ten) + ' · Quản trị lớp offline (bản riêng)';
   bind();
 }
 
 /* ---------- đăng nhập ---------- */
 function login(err) {
   $('#top').hidden = true; $('#banner').hidden = !DEMO; if (DEMO) $('#banner').textContent = 'Chế độ xem thử: PIN là 2468, dữ liệu giả lưu trên máy này.';
-  $('#main').innerHTML = `<div class="card login"><h1>Quản trị lớp offline</h1><p class="muted">Dành cho cô giáo. Chọn lớp rồi nhập PIN của lớp (PIN nằm ở tab CaiDat của Google Sheet quản lý).</p>
+  $('#main').innerHTML = `<div class="card login"><h1>Quản trị lớp offline · bản riêng</h1><p class="muted">Dành cho cô giáo. Chọn lớp rồi nhập PIN của lớp (PIN nằm ở tab CaiDat của Google Sheet quản lý).</p>
     <div class="lopsw" role="tablist">${Object.keys(LOPS).map(l => `<button class="pill" role="tab" aria-selected="${l === S.lop}" data-lop0="${l}" type="button">${LOPS[l].ten}</button>`).join('')}</div>
     <form id="lf"><label class="f" for="pin">PIN lớp ${esc(LOPS[S.lop].ten)}</label><input id="pin" type="password" inputmode="numeric" autocomplete="off" autofocus>
     <div class="err" id="lerr" role="alert">${esc(err || '')}</div><button class="btn" type="submit" style="width:100%">Vào quản trị</button></form></div>`;
