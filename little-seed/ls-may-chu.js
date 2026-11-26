@@ -107,7 +107,11 @@ function clMerge(x, y) {
   if (o._shop) { const s = n._shop = n._shop || {}, t = o._shop;
     s.spent = Math.max(+s.spent || 0, +t.spent || 0); s.own = addMissing(s.own || {}, t.own);
     ['pets', 'mons'].forEach(f => { s[f] = s[f] || []; (t[f] || []).forEach(z => { if (!s[f].some(w => w.sp === z.sp)) s[f].push(clCopy(z)); }); });
-    s.orders = s.orders || []; (t.orders || []).forEach(z => { if (!s.orders.some(w => w.code === z.code)) s.orders.push(clCopy(z)); }); }
+    s.orders = s.orders || []; (t.orders || []).forEach(z => { if (!s.orders.some(w => w.code === z.code)) s.orders.push(clCopy(z)); });
+    /* Phòng đổi quà mới (26/11/2026): gộp đồ vườn, Rồng trùm đã thắng, lượt đánh trong ngày, album ảnh giữa các máy */
+    s.deco = addMissing(s.deco || {}, t.deco); s.boss = addMissing(s.boss || {}, t.boss);
+    s.bossTry = s.bossTry || {}; Object.keys(t.bossTry || {}).forEach(k => { const x = s.bossTry[k], y = t.bossTry[k]; if (!x || (y && (y.d > x.d || (y.d === x.d && y.n > x.n)))) s.bossTry[k] = clCopy(y); });
+    s.album = (s.album || []).concat((t.album || []).filter(z => !(s.album || []).some(w => w.t === z.t))).sort((p, q) => q.t - p.t).slice(0, 30); }
   if (o._j) { const j = n._j = n._j || {}, t = o._j;
     ['days', 'lop', 'badges', 'gifts'].forEach(f => { j[f] = addMissing(j[f] || {}, t[f]); });
     j.rec = Math.max(+j.rec || 0, +t.rec || 0); j.on = Math.max(+j.on || 0, +t.on || 0); }
