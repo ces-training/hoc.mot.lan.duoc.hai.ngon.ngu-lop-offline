@@ -26,6 +26,7 @@ Sửa mã sau này: dán mã mới → Lưu → **Triển khai → Quản lý tr
 | BuoiLop | (bản 4) Mỗi buổi một dòng: ngày dạy, đã dạy chưa, ghi chú buổi. |
 | GhiChu | (bản 4) Nhật ký từng bạn (tiến bộ, cần hỗ trợ, phụ huynh, nề nếp). Cột `xoa` = x là đã xoá. |
 | TaiNguyen | (bản 4) Link tài liệu riêng của lớp (Drive, Sheet, Zalo…), chỉ hiện sau khi nhập PIN. Cô sửa ngay trong Sheet hoặc ở mục Tài nguyên của trang quản trị. |
+| LopHoc | (bản 7) Mỗi lớp học một dòng: mã lớp, khoá (ls/sd), tên lớp, lịch học, ngày khai giảng, ghi chú. Cột `an` = x là đã xoá. Trang quản trị ghi vào đây; HocSinh có thêm cột `lop_hoc` (mã lớp của con), BuoiLop thêm cột `lh`. |
 
 ## Tiến độ không mất khi đổi máy
 - Mỗi lần con làm xong một việc, web lưu trên máy và gửi bản đầy đủ lên tab TienDo (gom 5 giây/lần; khi con tắt tab cũng gửi nốt).
@@ -84,3 +85,10 @@ Mỗi con có **mã** (trong link `?con=MÃ`) và **PIN 4 số**. Mỗi con nh�
 1. Mở Apps Script, xoá nội dung `Code.gs` cũ, dán `Code.gs` mới, bấm Lưu.
 2. Triển khai → Quản lý các lần triển khai → ✏️ → Phiên bản mới → Triển khai (link `/exec` giữ nguyên).
 3. Kiểm tra: mở `…/exec?action=ping`, phải thấy `"v":6`. Chưa nâng thì nút "Con chưa có PIN" báo chưa tìm được tên.
+
+
+## Lớp học trong mỗi khoá (bản 7, 26/11/2026 · web lớp offline bản riêng)
+- Nhiều lớp ở CES dùng chung web Little Seed hoặc Seedling. Ở trang quản trị, mục **Lớp học**: tạo lớp (tên, lịch học, ngày khai giảng), xếp các con vào lớp, chuyển con sang lớp khác (từng bạn hoặc chọn nhiều bạn một lần). Chuyển lớp không làm mất sao, tiến độ web, điểm danh.
+- Ô **Lớp** trên đầu trang quản trị lọc mọi mục theo một lớp. Điểm danh, ngày dạy, ghi chú buổi và ngày khai giảng ghi riêng cho lớp đang chọn. Bảng của con hiện buổi học và khai giảng của đúng lớp con.
+- Chỉ xoá được lớp không còn bạn nào. Tạo tài khoản con khi đang chọn một lớp thì các bạn mới vào luôn lớp đó.
+- Cập nhật máy chủ lên bản 7: dán Code.gs mới → Lưu → chạy hàm **caiDat** (tạo tab LopHoc và các cột mới) → **Triển khai → Quản lý triển khai → ✏️ → Phiên bản: Phiên bản mới → Triển khai**. Mở link /exec?action=ping thấy `"v":7` là xong.

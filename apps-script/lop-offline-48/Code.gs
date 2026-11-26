@@ -26,25 +26,32 @@
  * Bản 6 (16/11/2026): con chưa có PIN đăng nhập bằng HỌ TÊN (lệnh ten). Web tìm tên trong lớp; chưa có thì tạo dòng mới
  *   (cột nguon = tu_nhap) để lưu kết quả luyện tập, đổi máy nhập lại đúng họ tên là lấy lại bài. Đăng nhập bằng tên chỉ mở Unit 1;
  *   từ Unit 2 web vẫn đòi mã + PIN do CES cấp. Con đã có PIN mà nhập tên → web hỏi PIN.
+ * Bản 7 (26/11/2026, web lớp offline bản riêng): LỚP HỌC do quản trị lập trong mỗi khoá (ls/sd), nhiều lớp dùng chung một web.
+ *   Tab LopHoc (id, khoa, ten, lich, khai_giang, ghi_chu, tao, an); HocSinh thêm cột lop_hoc (mã lớp học của con);
+ *   BuoiLop thêm cột lh (mỗi lớp học ghi ngày dạy, ghi chú buổi riêng). Lệnh: qt_lh_luu, qt_lh_xoa, qt_chuyen.
+ *   Không có lớp học nào thì mọi thứ chạy như bản 6.
  */
 
 const TAB = {
   CaiDat:  ['lop', 'ten_lop', 'pin', 'ghi_chu', 'video_folder', 'khai_giang', 'max_may'],
-  HocSinh: ['lop', 'id', 'ten', 'tao', 'web', 'vi', 'ngay', 'cuoi', 'luu_cuoi', 'trang_thai', 'pin_con', 'may', 'cho_may', 'nguon'],
+  HocSinh: ['lop', 'id', 'ten', 'tao', 'web', 'vi', 'ngay', 'cuoi', 'luu_cuoi', 'trang_thai', 'pin_con', 'may', 'cho_may', 'nguon', 'lop_hoc'],
   TienDo:  ['lop', 'id', 'v', 't', 'capnhat', 'do_dai', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6'],
   Thuong:  ['id', 'lop', 'kid', 'n', 'why', 'at', 'huy'],
   DoiQua:  ['code', 'lop', 'kid', 'ten', 'qua', 'ten_qua', 'sao', 'at', 'st', 'note'],
   /* ---- Trang quản trị giáo viên (quan-tri-lop/), bản 4 ---- */
   BuoiHS:  ['k', 'lop', 'buoi', 'kid', 'cm', 'tg', 'en', 'zh', 'bt', 'note', 'at'],   // mỗi con mỗi buổi một dòng: có mặt, tham gia, nói EN, nói ZH, bài tập (0–3)
-  BuoiLop: ['k', 'lop', 'buoi', 'ngay', 'da_day', 'ghi_chu', 'at'],                   // mỗi buổi một dòng: ngày dạy, đã dạy chưa, ghi chú buổi
+  BuoiLop: ['k', 'lop', 'buoi', 'ngay', 'da_day', 'ghi_chu', 'at', 'lh'],             // mỗi buổi (của mỗi lớp học, cột lh) một dòng: ngày dạy, đã dạy chưa, ghi chú buổi
   GhiChu:  ['id', 'lop', 'kid', 'buoi', 'loai', 'noi_dung', 'at', 'xoa', 'chia_se'],  // nhật ký từng con; chia_se = x thì con và ba mẹ thấy trong Bảng của con
-  TaiNguyen: ['id', 'lop', 'nhom', 'ten', 'url', 'ghi_chu', 'thu_tu']                 // link tài liệu của lớp (chỉ hiện sau khi nhập PIN)
+  TaiNguyen: ['id', 'lop', 'nhom', 'ten', 'url', 'ghi_chu', 'thu_tu'],                // link tài liệu của lớp (chỉ hiện sau khi nhập PIN)
+  /* ---- bản 7: lớp học trong mỗi khoá ---- */
+  LopHoc:  ['id', 'khoa', 'ten', 'lich', 'khai_giang', 'ghi_chu', 'tao', 'an']        // khoa = ls / sd; an = x là đã xoá
 };
 const LOAI_GHI = ['tien_bo', 'ho_tro', 'phu_huynh', 'hanh_vi', 'khac'];
 const LOP_MAC_DINH = [['ls', 'Little Seed offline 48 buổi'], ['sd', 'Seedling offline 48 buổi']];
-const TEXT_COLS = { HocSinh: ['lop', 'id', 'ten', 'cuoi', 'pin_con', 'may', 'cho_may', 'nguon'], TienDo: ['lop', 'id', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6'], Thuong: ['id', 'lop', 'kid'],
+const TEXT_COLS = { HocSinh: ['lop', 'id', 'ten', 'cuoi', 'pin_con', 'may', 'cho_may', 'nguon', 'lop_hoc'], TienDo: ['lop', 'id', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6'], Thuong: ['id', 'lop', 'kid'],
   DoiQua: ['code', 'lop', 'kid'], CaiDat: ['lop', 'pin', 'video_folder', 'khai_giang'],
-  BuoiHS: ['k', 'lop', 'kid'], BuoiLop: ['k', 'lop', 'ngay'], GhiChu: ['id', 'lop', 'kid'], TaiNguyen: ['id', 'lop'] };
+  BuoiHS: ['k', 'lop', 'kid'], BuoiLop: ['k', 'lop', 'ngay', 'lh'], GhiChu: ['id', 'lop', 'kid'], TaiNguyen: ['id', 'lop'],
+  LopHoc: ['id', 'khoa', 'khai_giang'] };
 const VIDEO_CACHE_GIAY = 300;   // danh sách video nhớ 5 phút: video mới thả vào Drive hiện trên web chậm nhất ~5 phút
 const CHUNK = 45000;           // một ô Google Sheet chứa tối đa 50.000 ký tự
 const MAX_DATA = CHUNK * 6;    // ~270.000 ký tự tiến độ mỗi con
@@ -72,7 +79,7 @@ function handle_(q) {
   const needPin = () => (pinOk() ? null : { ok: false, err: lop ? 'Sai mã PIN' : 'Thiếu mã lớp' });
 
   switch (q.action) {
-    case 'ping': return { ok: true, v: 6 };
+    case 'ping': return { ok: true, v: 7 };
 
     /* ---------- Góc vinh danh (công khai) ---------- */
     case 'video': {
@@ -119,8 +126,9 @@ function handle_(q) {
       const k = find_('HocSinh', 'id', q.id); if (!k) return { ok: false, err: 'Không có mã con này' };
       const g = kidGate_(q, k); if (g) return g;
       const id = String(k.obj.id), lopK = k.obj.lop, cfg = rows_('CaiDat').find(x => x.lop === lopK) || {};
-      const bl = rows_('BuoiLop').filter(r => r.lop === lopK), ngayBuoi = {}; bl.forEach(r => { ngayBuoi[+r.buoi] = ngay_(r.ngay); });
-      return { ok: true, ten: k.obj.ten, lop: lopK, web: +k.obj.web || 0, ngay: +k.obj.ngay || 0, cuoi: String(k.obj.cuoi || ''), khai_giang: ngay_(cfg.khai_giang),
+      const lh = String(k.obj.lop_hoc || ''), lhO = lh ? lopHoc_(lopK).find(x => x.id === lh) : null;   // bản 7: buổi và khai giảng theo lớp học của con
+      const bl = rows_('BuoiLop').filter(r => r.lop === lopK && String(r.lh || '') === (lhO ? lh : '')), ngayBuoi = {}; bl.forEach(r => { ngayBuoi[+r.buoi] = ngay_(r.ngay); });
+      return { ok: true, ten: k.obj.ten, lop: lopK, web: +k.obj.web || 0, ngay: +k.obj.ngay || 0, cuoi: String(k.obj.cuoi || ''), khai_giang: ngay_((lhO && lhO.khai_giang) || cfg.khai_giang), lop_hoc: lhO ? lhO.ten : '',
         sao_co: rows_('Thuong').filter(a => a.kid === id && !truthy_(a.huy)).reduce((t, a) => t + (+a.n || 0), 0),
         da_day: bl.filter(r => truthy_(r.da_day)).map(r => +r.buoi).sort((a, b) => a - b),
         buoi: rows_('BuoiHS').filter(r => r.kid === id).map(r => { const o = hsOut_(r); delete o.note; o.ngay = ngayBuoi[o.buoi] || ''; return o; }).sort((a, b) => a.buoi - b.buoi),
@@ -204,8 +212,8 @@ function handle_(q) {
       const bad = needPin(); if (bad) return bad;
       const cfg = rows_('CaiDat').find(x => x.lop === lop) || {};
       const kids = rows_('HocSinh').filter(k => k.lop === lop), ids = new Set(kids.map(k => k.id));
-      return { ok: true, v: 5, cfg: { ten_lop: cfg.ten_lop || '', khai_giang: ngay_(cfg.khai_giang) },
-        kids: kids.map(k => Object.assign(kidOut_(k), { pin: String(k.pin_con || ''), may: parseJ_(k.may), cho: parseJ_(k.cho_may) })), max_may: maxMay_(lop),
+      return { ok: true, v: 7, cfg: { ten_lop: cfg.ten_lop || '', khai_giang: ngay_(cfg.khai_giang) }, lh: lopHoc_(lop).map(lhOut_),
+        kids: kids.map(k => Object.assign(kidOut_(k), { pin: String(k.pin_con || ''), may: parseJ_(k.may), cho: parseJ_(k.cho_may), lh: String(k.lop_hoc || '') })), max_may: maxMay_(lop),
         awards: rows_('Thuong').filter(a => ids.has(a.kid)).reverse().slice(0, 400).map(awardOut_),
         orders: rows_('DoiQua').filter(o => ids.has(o.kid)).reverse().map(orderOut_),
         hs: rows_('BuoiHS').filter(r => r.lop === lop).map(hsOut_),
@@ -217,7 +225,8 @@ function handle_(q) {
       const bad = needPin(); if (bad) return bad;
       const b = Math.round(+q.buoi); if (!(b >= 0 && b <= 60)) return { ok: false, err: 'Số buổi không hợp lệ' };
       const mine = new Set(rows_('HocSinh').filter(k => k.lop === lop).map(k => k.id)), now = new Date();
-      upsertMany_('BuoiLop', [{ k: lop + '|' + b, lop, buoi: b, ngay: ngay_(q.ngay), da_day: truthy_(q.da_day) ? 1 : '', ghi_chu: String(q.ghi_chu || '').slice(0, 600), at: now }]);
+      const lh = String(q.lh || ''); if (lh && !lopHoc_(lop).some(x => x.id === lh)) return { ok: false, err: 'Không có lớp học này' };
+      upsertMany_('BuoiLop', [{ k: lop + '|' + b + (lh ? '|' + lh : ''), lop, buoi: b, ngay: ngay_(q.ngay), da_day: truthy_(q.da_day) ? 1 : '', ghi_chu: String(q.ghi_chu || '').slice(0, 600), at: now, lh }]);
       let rows = q.rows; if (typeof rows === 'string') { try { rows = JSON.parse(rows); } catch (x) { rows = []; } }
       const lv = x => (x === '' || x == null) ? '' : Math.max(0, Math.min(3, Math.round(+x) || 0));
       const list = (rows || []).filter(r => mine.has(String(r.kid))).map(r => ({ k: lop + '|' + b + '|' + r.kid, lop, buoi: b, kid: String(r.kid),
@@ -256,8 +265,9 @@ function handle_(q) {
       let names = q.ten; if (typeof names === 'string') { try { names = JSON.parse(names); } catch (x) { names = names.split('\n'); } }
       names = (names || []).map(x => String(x).trim().slice(0, 40)).filter(Boolean).slice(0, 60);
       const have = new Set(rows_('HocSinh').map(x => x.id)), out = [];
+      const lh = String(q.lh || ''); if (lh && !lopHoc_(lop).some(x => x.id === lh)) return { ok: false, err: 'Không có lớp học này' };
       names.forEach(ten => { let id; do { id = newId_(''); } while (have.has(id)); have.add(id); const pin = newPin_();
-        add_('HocSinh', { lop, id, ten, tao: new Date(), web: 0, vi: 0, ngay: 0, cuoi: '', luu_cuoi: '', pin_con: pin, may: '', cho_may: '' }); out.push({ id, ten, pin }); });
+        add_('HocSinh', { lop, id, ten, tao: new Date(), web: 0, vi: 0, ngay: 0, cuoi: '', luu_cuoi: '', pin_con: pin, may: '', cho_may: '', lop_hoc: lh }); out.push({ id, ten, pin }); });
       return { ok: true, kids: out };
     }
     case 'qt_pin': {   // mode: moi = PIN mới (xoá hết máy đã nhớ), tat = bỏ PIN. ids: danh sách mã, hoặc tat_ca=1 cho mọi con chưa có PIN
@@ -297,6 +307,31 @@ function handle_(q) {
       const bad = needPin(); if (bad) return bad;
       const t = find_('TaiNguyen', 'id', q.id); if (t && t.obj.lop === lop) sh_('TaiNguyen').deleteRow(t.row);
       return { ok: true };
+    }
+
+    /* ---------- bản 7: lớp học trong khoá ---------- */
+    case 'qt_lh_luu': {   // tạo lớp mới hoặc sửa tên, lịch, ngày khai giảng, ghi chú
+      const bad = needPin(); if (bad) return bad;
+      const ten = String(q.ten || '').trim().slice(0, 60); if (!ten) return { ok: false, err: 'Chưa có tên lớp' };
+      const all = lopHoc_(lop); if (all.some(x => x.id !== String(q.id || '') && tenSo_(x.ten) === tenSo_(ten))) return { ok: false, err: 'Khoá này đã có lớp tên như vậy' };
+      const o = { ten, lich: String(q.lich || '').trim().slice(0, 120), khai_giang: ngay_(q.khai_giang), ghi_chu: String(q.ghi_chu || '').trim().slice(0, 300) };
+      if (q.id) { const c = find_('LopHoc', 'id', q.id); if (!c || c.obj.khoa !== lop || truthy_(c.obj.an)) return { ok: false, err: 'Không có lớp này' }; set_('LopHoc', c.row, o); return { ok: true, id: String(q.id) }; }
+      o.id = newId_('L'); o.khoa = lop; o.tao = new Date(); o.an = ''; add_('LopHoc', o); return { ok: true, id: o.id };
+    }
+    case 'qt_lh_xoa': {   // chỉ xoá được lớp không còn bạn nào
+      const bad = needPin(); if (bad) return bad;
+      const c = find_('LopHoc', 'id', q.id); if (!c || c.obj.khoa !== lop) return { ok: false, err: 'Không có lớp này' };
+      const n = rows_('HocSinh').filter(k => k.lop === lop && String(k.lop_hoc || '') === String(q.id)).length;
+      if (n) return { ok: false, err: 'Lớp còn ' + n + ' bạn. Chuyển các bạn sang lớp khác trước khi xoá.' };
+      set_('LopHoc', c.row, { an: 'x' }); return { ok: true };
+    }
+    case 'qt_chuyen': {   // xếp / chuyển lớp: ids = danh sách mã con, lh = mã lớp đích ('' = chưa xếp lớp)
+      const bad = needPin(); if (bad) return bad;
+      const lh = String(q.lh || ''); if (lh && !lopHoc_(lop).some(x => x.id === lh)) return { ok: false, err: 'Không có lớp học này' };
+      const ids = (Array.isArray(q.ids) ? q.ids : String(q.ids || '').split(',')).map(String).filter(Boolean);
+      const s = sh_('HocSinh'), v = s.getDataRange().getValues(), h = v[0].map(String), ci = h.indexOf('id'), cl = h.indexOf('lop'), cc = h.indexOf('lop_hoc');
+      let n = 0; for (let i = 1; i < v.length; i++) if (ids.includes(String(v[i][ci])) && String(v[i][cl]) === lop) { s.getRange(i + 1, cc + 1).setNumberFormat('@').setValue(lh); n++; }
+      return { ok: true, n };
     }
   }
   return { ok: false, err: 'Lệnh không rõ' };
@@ -365,8 +400,10 @@ function upsertMany_(name, list) {
     s.getRange(st, 1, add.length, h.length).setValues(add.map(o => h.map(c => cell(c, o[c])))); }
 }
 function hsOut_(r) { return { buoi: +r.buoi, kid: r.kid, cm: r.cm || '', tg: r.tg === '' ? '' : +r.tg, en: r.en === '' ? '' : +r.en, zh: r.zh === '' ? '' : +r.zh, bt: r.bt === '' ? '' : +r.bt, note: r.note || '' }; }
-function blOut_(r) { return { buoi: +r.buoi, ngay: ngay_(r.ngay), da_day: truthy_(r.da_day), ghi_chu: r.ghi_chu || '' }; }
+function blOut_(r) { return { buoi: +r.buoi, ngay: ngay_(r.ngay), da_day: truthy_(r.da_day), ghi_chu: r.ghi_chu || '', lh: String(r.lh || '') }; }
 function gcOut_(r) { return { id: String(r.id), kid: r.kid, buoi: r.buoi === '' ? '' : +r.buoi, loai: r.loai || 'khac', nd: r.noi_dung || '', at: +r.at || 0, cs: truthy_(r.chia_se) }; }
+function lopHoc_(khoa) { return rows_('LopHoc').filter(x => x.khoa === khoa && !truthy_(x.an)).sort((a, b) => String(a.ten).localeCompare(String(b.ten), 'vi')); }
+function lhOut_(r) { return { id: String(r.id), ten: r.ten || '', lich: r.lich || '', khai_giang: ngay_(r.khai_giang), ghi_chu: r.ghi_chu || '' }; }
 function tnOut_(r) { return { id: String(r.id), nhom: r.nhom || 'Khác', ten: r.ten || '', url: r.url || '', ghi_chu: r.ghi_chu || '', thu_tu: +r.thu_tu || 0 }; }
 
 /* Chị chạy hàm này MỘT lần sau khi dán bản 4: tạo các tab mới và nạp sẵn vài link (Sheet quản lý, thư mục video vinh danh) vào tab TaiNguyen.
@@ -442,7 +479,7 @@ function set_(name, row, o) {
 }
 function norm_(k, x) {
   if (x instanceof Date) return x.getTime();
-  if (['id', 'kid', 'lop', 'code', 'pin', 'ten', 'cuoi', 'video_folder', 'pin_con', 'may', 'cho_may'].includes(k)) return String(x);
+  if (['id', 'kid', 'lop', 'code', 'pin', 'ten', 'cuoi', 'video_folder', 'pin_con', 'may', 'cho_may', 'lop_hoc', 'lh', 'khoa'].includes(k)) return String(x);
   return x;
 }
 function pinOf_(lop) { const r = rows_('CaiDat').find(x => x.lop === lop); return r ? String(r.pin).trim() : ''; }
