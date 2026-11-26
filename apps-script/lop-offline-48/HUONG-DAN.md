@@ -6,7 +6,7 @@ Một Google Sheet và một link Apps Script dùng chung cho hai web:
 
 ## Bật máy chủ (làm một lần, khoảng 10 phút)
 1. Mở Sheet → **Tiện ích mở rộng → Apps Script**. Đặt tên dự án "Máy chủ lớp offline 48 buổi".
-2. Xoá mã có sẵn trong `Code.gs`. Mở [Code.gs](https://raw.githubusercontent.com/Anh-Trung-Kids-CES/hoc.mot.lan.duoc.hai.ngon.ngu/main/apps-script/lop-offline-48/Code.gs), chọn hết (Ctrl+A), chép, dán vào. Bấm **Lưu**.
+2. Xoá mã có sẵn trong `Code.gs`. Mở [Code.gs](https://raw.githubusercontent.com/ces-training/hoc.mot.lan.duoc.hai.ngon.ngu-lop-offline/main/apps-script/lop-offline-48/Code.gs), chọn hết (Ctrl+A), chép, dán vào. Bấm **Lưu**.
 3. Ở thanh trên, chọn hàm **caiDat** → **Chạy**. Google hỏi quyền: chọn tài khoản → nếu thấy "Google chưa xác minh ứng dụng này" thì bấm **Nâng cao → Đi tới … (không an toàn) → Cho phép**.
 4. **Triển khai → Tùy chọn triển khai mới** → bánh răng → **Ứng dụng web**. "Thực thi với tư cách": **Tôi**. "Người có quyền truy cập": **Bất kỳ ai**. Bấm **Triển khai**, chép link kết thúc bằng `/exec`.
 5. Dán link vào dòng `const SDL_API = '';` của **cả hai** tệp `little-seed/ls-may-chu.js` và `seedling/seedling-may-chu.js` (hoặc gửi link cho Claude để gắn).
