@@ -110,7 +110,7 @@ function parentGate(title, detail, ok){
 function qCanReal(){
   if(DEMO){ demoGate('qua'); return false; }
   if(TEACHER){ toast('Chế độ giáo viên chỉ xem thử, không đổi quà thật và học bổng.'); return false; }
-  if(!KID || KID.temp){ toast('Ba mẹ đăng nhập bằng tên con và SĐT/Gmail để đổi quà thật nhé.'); askProfile(KID&&KID.group||'', route); return false; }
+  if(!KID || KID.temp){ toast('Ba mẹ nhập mã con và PIN do CES cấp để đổi quà thật nhé.')   /* LỚP OFFLINE: theo bản cuộc thi 26/11 */; askProfile(KID&&KID.group||'', route); return false; }
   return true;
 }
 function qCode(prefix){ const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<4;i++) s+=A[Math.floor(Math.random()*A.length)]; return prefix+'-'+s; }
