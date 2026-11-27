@@ -124,7 +124,7 @@ function shell() {
 function draw() {
   if (!S.d) return login();
   shell();
-  const m = $('#main'); const f = { tq: vTq, lh: vLh, hs: vHs, dd: vDd, tk: vTk, sq: vSq, tn: vTn }[S.tab] || vTq;
+  const m = $('#main'); const f = { tq: vTq, lh: vLh, hs: vHs, dd: vDd, tk: vTk, sq: vSq, tn: vTn, ga: window.vGa }[S.tab] || vTq;
   m.innerHTML = f();
   document.title = (LOPS[S.lop].ten) + ' · Quản trị lớp offline (bản riêng)';
   bind();
