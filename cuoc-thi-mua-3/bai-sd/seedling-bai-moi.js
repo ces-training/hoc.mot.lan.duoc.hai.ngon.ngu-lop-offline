@@ -135,6 +135,7 @@ function viewHome() { document.body.classList.add('hub'); setActive('home');
       ${tile({ href: '#/hop-on', img: '../../seedling/tai-nguyen/trang/ls_album.webp', c: '#7B5CD6', t: 'Hộp ôn', sub: (() => { const b = onBank(); const k = onDue(b).length; return k ? `${k} thẻ đến hẹn ôn hôm nay` : `${b.length} thẻ trong hộp`; })() })}
       ${tile({ href: '#/qua', img: '../../seedling/tai-nguyen/qua/gift_rubik.webp', size: 'auto 62%', pos: '50% 55%', bg: '#FFE4EC', c: '#E3487A', t: 'Phòng đổi quà', sub: `⭐ ${qWallet()} sao trong ví` })}
       ${tile({ href: '#/hanh-trinh', img: '../../seedling/tai-nguyen/trang/ls_stickers.webp', size: 'auto 92%', bg: '#FFF8E1', c: '#C9A227', t: 'Hành trình của con', sub: 'Huy hiệu · ngày học · lần nói' })}
+      ${tile({ href: '#/bang', img: '../../seedling/tai-nguyen/qua/gift_so_tay.webp', size: 'auto 80%', bg: '#E8F4FD', c: '#2B7BB9', t: 'Báo cáo học tập', sub: 'Ngày học · nhận xét của cô · bài giao thêm' })}
     </div>${GV ? '<p class="sx-demo">Chế độ giáo viên: mở tất cả các ngày. Thêm <code>?gv=0</code> vào link để tắt.</p>' : ''}</div>`;
 }
 

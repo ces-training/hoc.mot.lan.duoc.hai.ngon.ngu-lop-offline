@@ -12,6 +12,25 @@
 const SDL_API = '';   // Cuộc thi mùa 3: không dùng máy chủ lớp offline
 const API_ON = !!SDL_API;
 const LOP = 'sd', KEY = 'sdl';
+/* ---------- bản 10: LINK RIÊNG của con (.../con/?k=MÃ hoặc ?k=MÃ trên web): mở là học, không cần PIN ----------
+   - Link tự đưa con sang đúng web (Little Seed / Seedling), kể cả sau khi cô chuyển con lên khoá mới.
+   - "phiên" dữ liệu (P._ph): khi CES làm lại dữ liệu từ đầu, máy còn bản cũ sẽ tự bỏ bản cũ và học lại từ ngày 1. */
+const LINK_K = (() => { try { const m = location.search.match(/[?&]k=([a-z0-9]{8,20})/i); return m ? m[1].toLowerCase() : ''; } catch (e) { return ''; } })();
+const WEB_KHOA = { ls: '../../little-seed/', sd: '../../seedling/' };
+function linkOf(id) { return id ? (sget(KEY + '-k@' + id, '') || '') : ''; }
+function sangKhoa(lop) { if (!WEB_KHOA[lop] || lop === LOP) return; const k = LINK_K || linkOf(P.kidId); location.replace(WEB_KHOA[lop] + (k ? '?k=' + k : '?con=' + (P.kidId || '')) + location.hash); }
+function lamMoi(id, ph) { const ten = P.name; P = clEmpty(); P.kidId = id; P._ph = ph; if (ten) P.name = ten; P.co = { awards: [], seen: {} }; CL.dirty = false; clStore(); }
+async function linkInit() {
+  if (!LINK_K || !API_ON) return;
+  const r = await apiRaw({ action: 'con_link', k: LINK_K });
+  if (!r || !r.ok) { if (r && !r.net) try { toast(r.err || 'Link chưa đúng'); } catch (e) {} return; }
+  sset(KEY + '-k@' + r.id, LINK_K); const m = sget(KEY + '-k2id', {}) || {}; m[LINK_K] = r.id; sset(KEY + '-k2id', m);
+  if (r.lop !== LOP) return sangKhoa(r.lop);
+  if (P.kidId !== r.id) clSwitch(r.id);
+  if (!P.name && r.ten) { P.name = r.ten; clStore(); }
+  CL.pulled = ''; CL.tryAt = 0; await clPull(); try { route(); } catch (e) {}
+}
+addEventListener('DOMContentLoaded', () => { linkInit(); });
 
 /* ---------- máy chủ giả cho bản xem thử (localStorage) ---------- */
 const FAKE_PIN = '2468';
@@ -47,7 +66,9 @@ function fakeCall(q) {
     case 'bang': { const k = d.kids[q.id]; if (!k) return { ok: false, err: 'Không có mã con này' };   // bản xem thử: số liệu ví dụ
       return { ok: true, ten: k.ten, lop: LOP, web: k.web, ngay: k.ngay, cuoi: k.cuoi, khai_giang: '', sao_co: d.awards.filter(a => a.kid === k.id && !a.huy).reduce((t, a) => t + a.n, 0), da_day: [1, 2, 3],
         buoi: [{ buoi: 1, cm: 'c', tg: 3, en: 2, zh: 2, bt: 3, ngay: '' }, { buoi: 2, cm: 't', tg: 2, en: 2, zh: 1, bt: 2, ngay: '' }, { buoi: 3, cm: 'c', tg: 3, en: 3, zh: 2, bt: 3, ngay: '' }],
-        gc: [{ id: 'N1', kid: k.id, buoi: 3, loai: 'tien_bo', nd: 'Hôm nay con dám nói cả câu một mình. (Ví dụ của bản xem thử)', at: Date.now(), cs: true }] }; }
+        gc: [{ id: 'N1', kid: k.id, buoi: 3, loai: 'tien_bo', nd: 'Hôm nay con dám nói cả câu một mình. (Ví dụ của bản xem thử)', at: Date.now(), cs: true }],
+        hl: [{ id: 'H1', ten: 'Phiếu tô màu thêm (ví dụ)', buoi: 3, gc: 'Con tô và nói tên màu bằng tiếng Anh, tiếng Trung', co_file: true, url: '', file: 'phieu-vi-du.txt', at: Date.now() }] }; }
+    case 'con_hl_lay': return { ok: true, b64: btoa('Phieu vi du cua ban xem thu'), mime: 'text/plain', ten: 'phieu-vi-du.txt' };
     case 'cls': if (!pinOk) return { ok: false, err: 'Sai mã PIN' };
       return { ok: true, kids: Object.values(d.kids), awards: d.awards.slice(0, 200), orders: d.orders };
     case 'award': { if (!pinOk) return { ok: false, err: 'Sai mã PIN' }; const ids = String(q.ids || '').split(',').filter(x => d.kids[x]);
@@ -74,6 +95,7 @@ async function apiRaw(q) {
 
 /* ---------- mã của con trên máy này ---------- */
 function kidId() {
+  if (LINK_K) { const m = sget(KEY + '-k2id', {}) || {}; if (m[LINK_K] && P.kidId !== m[LINK_K]) clSwitch(m[LINK_K]); }
   try { const m = location.search.match(/[?&]con=([A-Za-z0-9]+)/); if (m && P.kidId !== m[1].toUpperCase()) clSwitch(m[1].toUpperCase()); } catch (e) {}
   if (!P.kidId && !API_ON) { P.kidId = 'MAYNAY'; save(); }
   if (P.kidId && CL.pulled !== P.kidId && !CL.busy && Date.now() - CL.tryAt > 30000) setTimeout(clPull, 0);
@@ -107,7 +129,11 @@ function clMerge(x, y) {
   if (o._shop) { const s = n._shop = n._shop || {}, t = o._shop;
     s.spent = Math.max(+s.spent || 0, +t.spent || 0); s.own = addMissing(s.own || {}, t.own);
     ['pets', 'mons'].forEach(f => { s[f] = s[f] || []; (t[f] || []).forEach(z => { if (!s[f].some(w => w.sp === z.sp)) s[f].push(clCopy(z)); }); });
-    s.orders = s.orders || []; (t.orders || []).forEach(z => { if (!s.orders.some(w => w.code === z.code)) s.orders.push(clCopy(z)); }); }
+    s.orders = s.orders || []; (t.orders || []).forEach(z => { if (!s.orders.some(w => w.code === z.code)) s.orders.push(clCopy(z)); });
+    /* Phòng đổi quà mới (26/11/2026): gộp đồ vườn, Rồng trùm đã thắng, lượt đánh trong ngày, album ảnh giữa các máy */
+    s.deco = addMissing(s.deco || {}, t.deco); s.boss = addMissing(s.boss || {}, t.boss);
+    s.bossTry = s.bossTry || {}; Object.keys(t.bossTry || {}).forEach(k => { const x = s.bossTry[k], y = t.bossTry[k]; if (!x || (y && (y.d > x.d || (y.d === x.d && y.n > x.n)))) s.bossTry[k] = clCopy(y); });
+    s.album = (s.album || []).concat((t.album || []).filter(z => !(s.album || []).some(w => w.t === z.t))).sort((p, q) => q.t - p.t).slice(0, 30); }
   if (o._j) { const j = n._j = n._j || {}, t = o._j;
     ['days', 'lop', 'badges', 'gifts'].forEach(f => { j[f] = addMissing(j[f] || {}, t[f]); });
     j.rec = Math.max(+j.rec || 0, +t.rec || 0); j.on = Math.max(+j.on || 0, +t.on || 0); }
@@ -137,6 +163,8 @@ async function clPull() {
   const id = P.kidId; if (!id || CL.busy) return; CL.busy = true; CL.tryAt = Date.now();
   try {
     const r = await api({ action: 'tai', id }); if (!r || !r.ok || P.kidId !== id) return;
+    if (r.lop && r.lop !== LOP) return sangKhoa(r.lop);
+    if ((+P._ph || 0) !== (+r.ph || 0)) { const cu = clHasWork(P); lamMoi(id, +r.ph || 0); if (cu) try { toast('Bài học đã được làm mới. Con học lại từ ngày 1 nhé!'); } catch (e) {} }
     CL.pulled = id;
     const srv = clParse(r.data), hadLocal = clHasWork(P);
     if (srv) {
@@ -161,6 +189,8 @@ async function clPush(now, tries) {
   const r = await api({ action: 'luu', id, base: +P._sv || 0, t: +P._t || Date.now(), data: JSON.stringify(clPack(P)) });
   if (P.kidId !== id) return;
   if (r && r.ok) { P._sv = +r.v; CL.dirty = false; CL.last = Date.now(); CL.err = ''; sset(KEY + '-progress', P); return; }
+  if (r && r.chuyen) return sangKhoa(r.chuyen);
+  if (r && r.phien) { lamMoi(id, +r.ph || 0); CL.pulled = ''; return clPull(); }
   if (r && r.xung && (tries || 0) < 3) {
     const m = clMerge(clPack(P), clParse(r.data) || {}); m.kidId = id; m._sv = +r.v || 0; P = m; clStore();
     return clPush(now, (tries || 0) + 1);
