@@ -33,6 +33,11 @@
  * Bản 8 (27/11/2026): TRAO ĐỔI giữa Giáo viên và Quản lý lớp. Tab TraoDoi: tin nhắn hoặc việc nhờ
  *   (tu/den = gv | ql), gắn được với một con, một buổi, hạn; trạng thái mo / xong / xoa, kèm trả lời.
  *   Lệnh: qt_td_them, qt_td_sua. qt_tai trả thêm td.
+ * Bản 9 (27/11/2026): HỌC LIỆU GỬI THÊM. Giáo viên tải file (tối đa HL_MAX_MB) lên ngay trên trang quản trị; máy chủ cất vào
+ *   thư mục Drive "Học liệu gửi thêm · lớp offline" (nằm cạnh Sheet này, chia thư mục con theo khoá / lớp học). File lớn hơn
+ *   thì giáo viên thả vào Drive của mình rồi dán link. Tab HocLieu ghi buổi, lớp, bạn nào, cách đưa (in phát / gửi phụ huynh),
+ *   quản lý lớp đánh dấu đã in phát, đã gửi. Lệnh: qt_hl_them, qt_hl_sua, qt_hl_lay (tải file qua máy chủ, cần PIN).
+ *   Xoá trên trang chỉ ẩn dòng, KHÔNG xoá file trong Drive.
  */
 
 const TAB = {
@@ -49,14 +54,19 @@ const TAB = {
   /* ---- bản 7: lớp học trong mỗi khoá ---- */
   LopHoc:  ['id', 'khoa', 'ten', 'lich', 'khai_giang', 'ghi_chu', 'tao', 'an'],       // khoa = ls / sd; an = x là đã xoá
   /* ---- bản 8: trao đổi, nhờ việc giữa GV và quản lý lớp ---- */
-  TraoDoi: ['id', 'lop', 'lh', 'tu', 'den', 'loai', 'kid', 'buoi', 'noi_dung', 'han', 'tt', 'tra_loi', 'ten', 'at', 'xong_at']
+  TraoDoi: ['id', 'lop', 'lh', 'tu', 'den', 'loai', 'kid', 'buoi', 'noi_dung', 'han', 'tt', 'tra_loi', 'ten', 'at', 'xong_at'],
+  /* ---- bản 9: học liệu gửi thêm (file trong Drive hoặc link) ---- */
+  HocLieu: ['id', 'lop', 'lh', 'buoi', 'kid', 'ten', 'file', 'mime', 'co', 'url', 'file_id', 'cach', 'ghi_chu', 'tu', 'nguoi', 'at', 'phat_at', 'gui_at', 'an']
 };
+const HL_MAX_MB = 10;                                     // file lớn hơn: giáo viên thả vào Drive rồi dán link
+const HL_THU_MUC = 'Học liệu gửi thêm · lớp offline';     // thư mục tạo cạnh Sheet quản lý
 const LOAI_GHI = ['tien_bo', 'ho_tro', 'phu_huynh', 'hanh_vi', 'khac'];
 const LOP_MAC_DINH = [['ls', 'Little Seed offline 48 buổi'], ['sd', 'Seedling offline 48 buổi']];
 const TEXT_COLS = { HocSinh: ['lop', 'id', 'ten', 'cuoi', 'pin_con', 'may', 'cho_may', 'nguon', 'lop_hoc'], TienDo: ['lop', 'id', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6'], Thuong: ['id', 'lop', 'kid'],
   DoiQua: ['code', 'lop', 'kid'], CaiDat: ['lop', 'pin', 'video_folder', 'khai_giang'],
   BuoiHS: ['k', 'lop', 'kid'], BuoiLop: ['k', 'lop', 'ngay', 'lh'], GhiChu: ['id', 'lop', 'kid'], TaiNguyen: ['id', 'lop'],
-  LopHoc: ['id', 'khoa', 'khai_giang'], TraoDoi: ['id', 'lop', 'lh', 'kid', 'han', 'ten'] };
+  LopHoc: ['id', 'khoa', 'khai_giang'], TraoDoi: ['id', 'lop', 'lh', 'kid', 'han', 'ten'],
+  HocLieu: ['id', 'lop', 'lh', 'kid', 'file_id', 'nguoi', 'file'] };
 const VIDEO_CACHE_GIAY = 300;   // danh sách video nhớ 5 phút: video mới thả vào Drive hiện trên web chậm nhất ~5 phút
 const CHUNK = 45000;           // một ô Google Sheet chứa tối đa 50.000 ký tự
 const MAX_DATA = CHUNK * 6;    // ~270.000 ký tự tiến độ mỗi con
@@ -84,7 +94,7 @@ function handle_(q) {
   const needPin = () => (pinOk() ? null : { ok: false, err: lop ? 'Sai mã PIN' : 'Thiếu mã lớp' });
 
   switch (q.action) {
-    case 'ping': return { ok: true, v: 8 };
+    case 'ping': return { ok: true, v: 9 };
 
     /* ---------- Góc vinh danh (công khai) ---------- */
     case 'video': {
@@ -217,7 +227,8 @@ function handle_(q) {
       const bad = needPin(); if (bad) return bad;
       const cfg = rows_('CaiDat').find(x => x.lop === lop) || {};
       const kids = rows_('HocSinh').filter(k => k.lop === lop), ids = new Set(kids.map(k => k.id));
-      return { ok: true, v: 8, td: rows_('TraoDoi').filter(r => r.lop === lop && r.tt !== 'xoa').reverse().slice(0, 400).map(tdOut_), cfg: { ten_lop: cfg.ten_lop || '', khai_giang: ngay_(cfg.khai_giang) }, lh: lopHoc_(lop).map(lhOut_),
+      return { ok: true, v: 9, hl_max: HL_MAX_MB, hl: rows_('HocLieu').filter(r => r.lop === lop && !truthy_(r.an)).reverse().slice(0, 300).map(hlOut_),
+        td: rows_('TraoDoi').filter(r => r.lop === lop && r.tt !== 'xoa').reverse().slice(0, 400).map(tdOut_), cfg: { ten_lop: cfg.ten_lop || '', khai_giang: ngay_(cfg.khai_giang) }, lh: lopHoc_(lop).map(lhOut_),
         kids: kids.map(k => Object.assign(kidOut_(k), { pin: String(k.pin_con || ''), may: parseJ_(k.may), cho: parseJ_(k.cho_may), lh: String(k.lop_hoc || '') })), max_may: maxMay_(lop),
         awards: rows_('Thuong').filter(a => ids.has(a.kid)).reverse().slice(0, 400).map(awardOut_),
         orders: rows_('DoiQua').filter(o => ids.has(o.kid)).reverse().map(orderOut_),
@@ -346,6 +357,42 @@ function handle_(q) {
       if (q.tra_loi != null) o.tra_loi = String(q.tra_loi).trim().slice(0, 600);
       set_('TraoDoi', t.row, o); return { ok: true };
     }
+    case 'qt_hl_them': {   // bản 9: giáo viên gửi thêm học liệu (file b64 hoặc link)
+      const bad = needPin(); if (bad) return bad;
+      const ten = String(q.ten || '').trim().slice(0, 120); if (!ten) return { ok: false, err: 'Chưa đặt tên bài' };
+      const lh = String(q.lh || ''), lhx = lh ? lopHoc_(lop).find(x => x.id === lh) : null; if (lh && !lhx) return { ok: false, err: 'Không có lớp học này' };
+      const kids = (Array.isArray(q.kid) ? q.kid : String(q.kid || '').split(',')).map(String).filter(Boolean);
+      for (const id of kids) { const k = find_('HocSinh', 'id', id); if (!k || k.obj.lop !== lop) return { ok: false, err: 'Không có con này trong lớp' }; }
+      const buoi = q.buoi === '' || q.buoi == null ? '' : Math.max(0, Math.min(48, Math.round(+q.buoi) || 0));
+      const o = { id: newId_('H'), lop, lh, buoi, kid: kids.join(','), ten, file: '', mime: '', co: '', url: '', file_id: '', cach: ['in', 'zalo', 'ca_hai'].includes(q.cach) ? q.cach : 'in',
+        ghi_chu: String(q.ghi_chu || '').trim().slice(0, 500), tu: q.tu === 'ql' ? 'ql' : 'gv', nguoi: String(q.nguoi || '').trim().slice(0, 40), at: new Date(), phat_at: '', gui_at: '', an: '' };
+      if (q.b64) {
+        const bytes = Utilities.base64Decode(String(q.b64));
+        if (bytes.length > HL_MAX_MB * 1048576) return { ok: false, err: 'File lớn hơn ' + HL_MAX_MB + ' MB', qua_lon: true };
+        const goc = String(q.file || 'tai-lieu').replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 120) || 'tai-lieu';
+        const cfg = rows_('CaiDat').find(x => x.lop === lop) || {};
+        const dir = thuMucCon_(thuMucCon_(thuMucHL_(), cfg.ten_lop || lop), lhx ? lhx.ten : 'Chưa xếp lớp');
+        const f = dir.createFile(Utilities.newBlob(bytes, String(q.mime || 'application/octet-stream'), (buoi !== '' ? 'Buổi ' + buoi + ' – ' : '') + goc));
+        f.setDescription(ten + (o.ghi_chu ? ' · ' + o.ghi_chu : ''));
+        Object.assign(o, { file: goc, mime: f.getMimeType(), co: bytes.length, file_id: f.getId(), url: f.getUrl() });
+      } else {
+        const u = String(q.url || '').trim(); if (!/^https:\/\/\S+$/.test(u)) return { ok: false, err: 'Cần file hoặc một link bắt đầu bằng https://' };
+        o.url = u.slice(0, 500);
+      }
+      add_('HocLieu', o); return { ok: true, hl: hlOut_(o) };
+    }
+    case 'qt_hl_sua': {   // đánh dấu đã in phát / đã gửi phụ huynh (1 = có, 0 = bỏ), hoặc ẩn (an = 1)
+      const bad = needPin(); if (bad) return bad;
+      const t = find_('HocLieu', 'id', q.id); if (!t || t.obj.lop !== lop) return { ok: false, err: 'Không có học liệu này' };
+      const o = {}; if (q.phat != null) o.phat_at = +q.phat ? new Date() : ''; if (q.gui != null) o.gui_at = +q.gui ? new Date() : ''; if (q.an != null) o.an = +q.an ? 'x' : '';
+      set_('HocLieu', t.row, o); return { ok: true };
+    }
+    case 'qt_hl_lay': {   // tải file về qua máy chủ (người không có quyền vào Drive của chị vẫn tải được, nhưng phải có PIN)
+      const bad = needPin(); if (bad) return bad;
+      const t = find_('HocLieu', 'id', q.id); if (!t || t.obj.lop !== lop || !t.obj.file_id) return { ok: false, err: 'Không có file này' };
+      const b = DriveApp.getFileById(String(t.obj.file_id)).getBlob();
+      return { ok: true, b64: Utilities.base64Encode(b.getBytes()), mime: b.getContentType(), ten: b.getName() };
+    }
     case 'qt_chuyen': {   // xếp / chuyển lớp: ids = danh sách mã con, lh = mã lớp đích ('' = chưa xếp lớp)
       const bad = needPin(); if (bad) return bad;
       const lh = String(q.lh || ''); if (lh && !lopHoc_(lop).some(x => x.id === lh)) return { ok: false, err: 'Không có lớp học này' };
@@ -364,6 +411,7 @@ function caiDat() {
   const cd = sh_('CaiDat'), have = rows_('CaiDat').map(r => r.lop);
   LOP_MAC_DINH.forEach(([lop, ten]) => { if (!have.includes(lop)) add_('CaiDat', { lop, ten_lop: ten, pin: String(100000 + Math.floor(Math.random() * 900000)), ghi_chu: 'Cô có thể sửa PIN ở ô này' }); });
   cd.autoResizeColumns(1, 4);
+  try { Logger.log('Thư mục học liệu gửi thêm: ' + thuMucHL_().getUrl()); } catch (x) { Logger.log('Chưa tạo được thư mục học liệu: ' + x); }
   Logger.log('Xong. PIN hiện tại: ' + rows_('CaiDat').map(r => r.ten_lop + ' = ' + r.pin).join(' · '));
 }
 
@@ -423,6 +471,17 @@ function upsertMany_(name, list) {
 function hsOut_(r) { return { buoi: +r.buoi, kid: r.kid, cm: r.cm || '', tg: r.tg === '' ? '' : +r.tg, en: r.en === '' ? '' : +r.en, zh: r.zh === '' ? '' : +r.zh, bt: r.bt === '' ? '' : +r.bt, note: r.note || '' }; }
 function blOut_(r) { return { buoi: +r.buoi, ngay: ngay_(r.ngay), da_day: truthy_(r.da_day), ghi_chu: r.ghi_chu || '', lh: String(r.lh || '') }; }
 function gcOut_(r) { return { id: String(r.id), kid: r.kid, buoi: r.buoi === '' ? '' : +r.buoi, loai: r.loai || 'khac', nd: r.noi_dung || '', at: +r.at || 0, cs: truthy_(r.chia_se) }; }
+function hlOut_(r) { return { id: String(r.id), lh: String(r.lh || ''), buoi: r.buoi === '' ? '' : +r.buoi, kid: String(r.kid || '').split(',').filter(Boolean), ten: r.ten || '', file: String(r.file || ''), mime: r.mime || '', co: +r.co || 0,
+  url: r.url || '', co_file: !!r.file_id, cach: r.cach || 'in', gc: r.ghi_chu || '', tu: r.tu || 'gv', nguoi: String(r.nguoi || ''), at: +r.at || +new Date(r.at) || 0, phat: +r.phat_at || 0, gui: +r.gui_at || 0 }; }
+/* thư mục Drive chứa học liệu gửi thêm: tạo một lần cạnh Sheet quản lý, nhớ mã trong Thuộc tính tập lệnh */
+function thuMucHL_() {
+  const P = PropertiesService.getScriptProperties(), id = P.getProperty('HL_FOLDER');
+  if (id) { try { const f = DriveApp.getFolderById(id); if (!f.isTrashed()) return f; } catch (x) {} }
+  const ss = SpreadsheetApp.getActiveSpreadsheet(), ps = DriveApp.getFileById(ss.getId()).getParents(), cha = ps.hasNext() ? ps.next() : DriveApp.getRootFolder();
+  const cu = cha.getFoldersByName(HL_THU_MUC), f = cu.hasNext() ? cu.next() : cha.createFolder(HL_THU_MUC);
+  P.setProperty('HL_FOLDER', f.getId()); return f;
+}
+function thuMucCon_(cha, ten) { ten = String(ten || '').replace(/[\\/]+/g, ' ').trim() || 'Khác'; const it = cha.getFoldersByName(ten); return it.hasNext() ? it.next() : cha.createFolder(ten); }
 function tdOut_(r) { return { id: String(r.id), lh: String(r.lh || ''), tu: r.tu, den: r.den, loai: r.loai || 'tin', kid: String(r.kid || ''), buoi: r.buoi === '' ? '' : +r.buoi, nd: r.noi_dung || '', han: ngay_(r.han), tt: r.tt || 'mo', tl: r.tra_loi || '', ten: r.ten || '', at: +r.at || +new Date(r.at) || 0, xong: +r.xong_at || 0 }; }
 function lopHoc_(khoa) { return rows_('LopHoc').filter(x => x.khoa === khoa && !truthy_(x.an)).sort((a, b) => String(a.ten).localeCompare(String(b.ten), 'vi')); }
 function lhOut_(r) { return { id: String(r.id), ten: r.ten || '', lich: r.lich || '', khai_giang: ngay_(r.khai_giang), ghi_chu: r.ghi_chu || '' }; }
@@ -501,7 +560,7 @@ function set_(name, row, o) {
 }
 function norm_(k, x) {
   if (x instanceof Date) return x.getTime();
-  if (['id', 'kid', 'lop', 'code', 'pin', 'ten', 'cuoi', 'video_folder', 'pin_con', 'may', 'cho_may', 'lop_hoc', 'lh', 'khoa'].includes(k)) return String(x);
+  if (['id', 'kid', 'lop', 'code', 'pin', 'ten', 'cuoi', 'video_folder', 'pin_con', 'may', 'cho_may', 'lop_hoc', 'lh', 'khoa', 'file_id', 'file', 'nguoi'].includes(k)) return String(x);
   return x;
 }
 function pinOf_(lop) { const r = rows_('CaiDat').find(x => x.lop === lop); return r ? String(r.pin).trim() : ''; }

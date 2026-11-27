@@ -100,3 +100,12 @@ Mỗi con có **mã** (trong link `?con=MÃ`) và **PIN 4 số**. Mỗi con nh�
 - Trên trang quản trị, ở "Việc của tôi" của mỗi vai có thẻ **Trao đổi với giáo viên / quản lý lớp**: việc vai kia gửi mình (bấm "Đã làm xong", "Trả lời"), ô gửi tin hoặc nhờ việc (chọn con, buổi, hạn, có câu mẫu), danh sách mình đã gửi kèm trạng thái. Số việc đang chờ hiện trên tab "Việc của tôi".
 - Ở thẻ "Con cần hỗ trợ", các giải pháp thuộc vai kia có nút 📌 để nhờ thẳng.
 - Cập nhật: dán Code.gs mới → Lưu → chạy `caiDat` → Triển khai → Quản lý triển khai → ✏️ → Phiên bản mới → Triển khai. Mở `/exec?action=ping` thấy `"v":8` là xong.
+
+## Học liệu gửi thêm (bản 9)
+
+- Giáo viên vào mục **Học liệu gửi thêm**: đặt tên bài, chọn buổi, cho cả lớp hay vài bạn, cách đưa (in phát / gửi phụ huynh / cả hai), ghi chú, rồi chọn file (tối đa 10 MB) hoặc dán link.
+- File được cất vào thư mục Drive **"Học liệu gửi thêm · lớp offline"**, tự tạo cạnh Sheet quản lý (trong "Dữ liệu web Anh - Trung"), chia thư mục con theo khoá → lớp học; tên file có số buổi. Mã thư mục nhớ trong Thuộc tính tập lệnh `HL_FOLDER`. Không đụng tới thư mục "Tài liệu 9 khoá học Anh - Trung".
+- File lớn hơn 10 MB: trang hướng dẫn giáo viên thả vào Google Drive của mình, chia sẻ "Bất kỳ ai có đường liên kết", dán link; link được gửi cho quản lý lớp. Muốn đổi giới hạn thì sửa `HL_MAX_MB` trong Code.gs (không nên quá 20).
+- Quản lý lớp thấy số bài chờ trên tab và ở "Việc của tôi"; bấm **Tải về** (tải qua máy chủ, không cần quyền vào Drive), đánh dấu **Đã in phát** / **Đã gửi phụ huynh**, có tin mẫu để chép gửi Zalo. Thẻ "Buổi tới" nhắc buổi đó có bao nhiêu bài thêm.
+- "Ẩn" chỉ bỏ khỏi danh sách, file trong Drive vẫn còn.
+- Cập nhật: dán Code.gs mới → Lưu → chạy `caiDat` (lần này Google có thể hỏi quyền Drive: bấm Cho phép; nhật ký in đường dẫn thư mục học liệu) → Triển khai → Quản lý triển khai → ✏️ → Phiên bản mới. `?action=ping` ra `"v":9` là xong.

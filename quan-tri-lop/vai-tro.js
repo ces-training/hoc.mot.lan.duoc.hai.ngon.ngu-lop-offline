@@ -12,8 +12,8 @@
 (function () {
   const VAI = { gv: { ten: 'Giáo viên', ic: '👩‍🏫' }, ql: { ten: 'Quản lý lớp', ic: '🗂️' } };
   const TAB_VAI = {
-    gv: [['tq', 'Việc của tôi'], ['dd', 'Điểm danh & chấm buổi'], ['hs', 'Học sinh'], ['ga', 'Giáo án 48 buổi'], ['tn', 'Tài nguyên']],
-    ql: [['tq', 'Việc của tôi'], ['lh', 'Lớp học'], ['hs', 'Học sinh'], ['dd', 'Điểm danh'], ['tk', 'Tài khoản con'], ['sq', 'Sao & quà'], ['ga', 'Giáo án 48 buổi'], ['tn', 'Tài nguyên']]
+    gv: [['tq', 'Việc của tôi'], ['dd', 'Điểm danh & chấm buổi'], ['hs', 'Học sinh'], ['ga', 'Giáo án 48 buổi'], ['hl', 'Học liệu gửi thêm'], ['tn', 'Tài nguyên']],
+    ql: [['tq', 'Việc của tôi'], ['lh', 'Lớp học'], ['hs', 'Học sinh'], ['dd', 'Điểm danh'], ['hl', 'Học liệu gửi thêm'], ['tk', 'Tài khoản con'], ['sq', 'Sao & quà'], ['ga', 'Giáo án 48 buổi'], ['tn', 'Tài nguyên']]
   };
   S.vai = store.get('qtl-vai') || '';
   const GA = () => ((window.GIAO_AN || {})[S.lop]) || {};
@@ -30,6 +30,7 @@
     el.innerHTML = Object.keys(VAI).map(v => `<button class="pill vai ${v}" role="tab" type="button" aria-selected="${S.vai === v}" data-vai="${v}">${vaiTen(v)}</button>`).join('');
     $$('[data-vai]', el).forEach(b => b.onclick = () => chonVai(b.dataset.vai));
     const n = tdCuaToi().filter(t => t.tt === 'mo').length, tq = $('#nav [data-tab=tq]'); if (n && tq) tq.insertAdjacentHTML('beforeend', `<span class="dot">${n}</span>`);
+    const nh = S.vai === 'ql' ? hlLop().filter(hlCho).length : 0, th = $('#nav [data-tab=hl]'); if (nh && th) th.insertAdjacentHTML('beforeend', `<span class="dot">${nh}</span>`);
   };
   function chonVai(v) { S.vai = v; store.set('qtl-vai', v); S.tab = 'tq'; draw(); scrollTo(0, 0); }
 
@@ -100,6 +101,7 @@
     const c2 = M.N != null ? `<div class="gb"><h3>➡️ Buổi tới · Buổi ${M.N}${M.ngayN ? ' · ' + ngayVN(M.ngayN) : ''}</h3><p class="gb-t">${esc(noiDung(M.N))}</p>${gN ? `<p class="sm muted">${esc(gN.tieu)}</p>` : ''}${gN && gN.mo ? `<p class="sm muted">${esc(gN.mo)}</p>` : ''}
       ${gN && gN.sau ? `<p class="sm"><b>Sau buổi, con sẽ:</b> ${esc(gN.sau)}</p>` : ''}
       ${vai === 'gv' && gN ? `${gN.loi ? `<p class="sm"><b>Lời lớp học:</b> ${esc(gN.loi)}</p>` : ''}<details class="sm"><summary><b>Đồ dùng cô chuẩn bị</b></summary><p>${esc(gN.do || '')}</p></details>${gN.cham ? `<p class="sm"><b>Chấm 4 đầu ra ở màn:</b> ${esc(gN.cham)}</p>` : ''}` : ''}
+      ${(() => { const h = hlLop().filter(x => x.buoi === M.N); return h.length ? `<p class="sm"><b>📎 ${h.length} học liệu gửi thêm cho buổi này:</b> ${h.map(x => esc(x.ten) + (hlCho(x) ? '' : ' ✓')).join(', ')} <button class="ghost xs" type="button" data-gotab="hl">Xem</button></p>` : ''; })()}
       <div class="row" style="margin-top:6px">${teachLinks(M.N).slice(0, vai === 'gv' ? 3 : 1).map(l => `<a class="ghost sm btnlink" href="${l.href}" target="_blank" rel="noopener">${esc(l.t)}</a>`).join('')}</div></div>` : '<div class="gb"><h3>🎉 Đã dạy hết 48 buổi</h3></div>';
     const prep = gL ? [gL.nha, gL.dan].filter(Boolean) : (M.need ? [`Ngày web ${(M.sN.days || []).join(', ')}`] : []);
     const chua = M.chua.length ? `<p class="sm"><b>${M.chua.length} bạn chưa làm xong web đến ngày ${M.need}:</b></p><ul class="ready">${M.chua.map(k => `<li><span data-kid="${esc(k.id)}" role="button" tabindex="0">${esc(k.ten)}</span> <span class="muted">· đang ngày ${k.ngay || 0}</span>${vai === 'ql' ? ` <button class="ghost xs" type="button" data-cp="${esc(tinNhacCon(k, M))}">Chép tin nhắc</button>` : ''}</li>`).join('')}</ul>`
@@ -212,7 +214,7 @@
     const bars = D.active.length ? `<div class="bars">${D.active.map(k => { const i = D.info[k.id], pct = Math.min(100, Math.round(100 * (k.ngay || 0) / tong)), cls = i.dsc == null || i.dsc >= 6 ? 'r' : i.dsc >= 4 ? 'a' : '';
       return `<div class="bar-row" data-kid="${esc(k.id)}" tabindex="0" role="button"><span class="nm">${esc(k.ten)}</span><div class="bar"><span class="fill ${cls}" style="width:${pct}%"></span>${exp != null ? `<i class="mark" style="left:${Math.min(100, Math.round(100 * exp / tong))}%"></i>` : ''}${M.need ? `<i class="mark need" style="left:${Math.min(100, Math.round(100 * M.need / tong))}%" title="cần xong trước buổi tới"></i>` : ''}</div><span class="vl">${k.ngay || 0}/${tong} ngày · ${i.dsc == null ? 'chưa học' : i.dsc === 0 ? 'hôm nay' : i.dsc + ' ngày trước'}</span></div>`; }).join('')}</div>` : '<div class="empty">Chưa có bạn nào.</div>';
     return `<div class="vaihead ${S.vai}"><b>${vaiTen(S.vai)}</b> · khu vực làm việc của ${S.vai === 'gv' ? 'giáo viên' : 'quản lý lớp'} · ${esc(lopTen())}</div>` +
-      theBuoi(M, S.vai) + `<div class="grid g2"><div>${theTraoDoi(D, M)}${S.vai === 'gv' ? viecGv(D, M) : viecQl(D, M)}</div><div>${theHoTro(D, S.vai)}<div class="card"><h2>Học web của từng bạn</h2>${bars}<div class="legend">Vạch xanh dương: web cần xong trước buổi tới${exp != null ? ' · vạch đen: tiến độ theo lịch' : ''}.</div></div></div></div>` + heat(D);
+      theBuoi(M, S.vai) + `<div class="grid g2"><div>${theHocLieu(M)}${theTraoDoi(D, M)}${S.vai === 'gv' ? viecGv(D, M) : viecQl(D, M)}</div><div>${theHoTro(D, S.vai)}<div class="card"><h2>Học web của từng bạn</h2>${bars}<div class="legend">Vạch xanh dương: web cần xong trước buổi tới${exp != null ? ' · vạch đen: tiến độ theo lịch' : ''}.</div></div></div></div>` + heat(D);
   };
 
   /* ---------- Giáo án 48 buổi ---------- */
@@ -226,6 +228,75 @@
     return `<div class="card"><h2>Giáo án 48 buổi · ${esc(LOPS[S.lop].ten)}</h2><p class="sm muted">Lấy từ kịch bản buổi offline. ✓ là buổi lớp đã dạy; buổi tới mở sẵn.</p>${rows}</div>`;
   };
 
+  /* ---------- học liệu gửi thêm (máy chủ bản 9): GV tải bài lên, QL lấy về in phát / gửi phụ huynh ---------- */
+  const CACH = { in: '🖨️ In phát trên lớp', zalo: '📱 Gửi phụ huynh', ca_hai: '🖨️ In phát + 📱 gửi phụ huynh' };
+  const hlLop = () => ((S.d && S.d.hl) || []).filter(h => !S.lh || S.lh === '_none' || !h.lh || h.lh === S.lh);
+  const hlCho = h => (h.cach !== 'zalo' && !h.phat) || (h.cach !== 'in' && !h.gui);   // còn việc cho quản lý lớp
+  const hlMax = () => (S.d && S.d.hl_max) || 10;
+  const MB = n => n < 1048576 ? Math.max(1, Math.round(n / 1024)) + ' KB' : (n / 1048576).toFixed(1).replace('.', ',') + ' MB';
+  const choAi = h => { if (!h.kid.length) return 'cả lớp'; const t = h.kid.map(id => (S.d.kids.find(k => k.id === id) || {}).ten).filter(Boolean); return t.length ? 'bạn ' + t.join(', ') : 'cả lớp'; };
+  const tinHl = h => `Ba mẹ ơi, cô gửi thêm "${h.ten}"${h.buoi !== '' ? ' cho buổi ' + h.buoi : ''}${h.kid.length ? ' dành cho ' + choAi(h) : ''}.${h.gc ? ' ' + h.gc + '.' : ''} Ba mẹ tải về/in cho con giúp cô nhé. Cảm ơn ba mẹ!`;
+  function theHocLieu(M) {
+    if (!S.v9) return '';
+    const all = hlLop(), cho = all.filter(hlCho);
+    if (S.vai === 'ql') return cho.length ? `<div class="card"><h2>📎 Học liệu gửi thêm cần lấy <span class="chip r">${cho.length}</span></h2><ul class="hls">${cho.slice(0, 5).map(h => `<li><b>${esc(h.ten)}</b> <span class="sm muted">· buổi ${h.buoi === '' ? '?' : h.buoi} · ${esc(choAi(h))} · ${esc(CACH[h.cach])}</span></li>`).join('')}</ul>${btnTab('hl', 'Mở mục Học liệu gửi thêm')}</div>` : '';
+    const mine = all.filter(h => h.tu === 'gv').slice(0, 4);
+    return `<div class="card"><h2>📎 Gửi thêm học liệu cho các con</h2><p class="sm muted">Sửa phiếu, thêm bài cho buổi ${M.N != null ? M.N : 'tới'}? Tải file lên đây, quản lý lớp sẽ lấy về in phát hoặc gửi phụ huynh.</p>
+      ${mine.length ? `<ul class="hls sm">${mine.map(h => `<li>${esc(h.ten)} · buổi ${h.buoi === '' ? '?' : h.buoi} ${hlCho(h) ? '<span class="chip a">chờ quản lý lớp</span>' : '<span class="chip g">✓ đã đưa cho con</span>'}</li>`).join('')}</ul>` : ''}
+      <div class="row">${btnTab('hl', '📎 Gửi thêm học liệu')}</div></div>`;
+  }
+  window.vHl = function () {
+    if (!S.v9) return `<div class="card"><h2>Học liệu gửi thêm</h2><p class="sm muted">Cần cập nhật máy chủ lên bản 9 (dán Code.gs mới → chạy caiDat, cho phép quyền Drive → Triển khai → Quản lý triển khai → ✏️ → Phiên bản mới).</p></div>`;
+    const D = derive(), M = moc(D), all = hlLop(), kids = D.active.slice().sort((a, b) => String(a.ten).localeCompare(String(b.ten), 'vi'));
+    const gv = S.vai !== 'ql', N = M.N != null ? M.N : '';
+    const form = `<details class="card hlgui" ${gv ? 'open' : ''}><summary><h2 style="display:inline">📎 Gửi thêm học liệu</h2></summary>
+      <p class="sm muted">File tối đa ${hlMax()} MB (PDF, ảnh, Word, PowerPoint…) được cất vào thư mục Drive "Học liệu gửi thêm" của lớp. File lớn hơn: thả vào Google Drive của mình rồi dán link.</p>
+      <label class="f" for="hlten">Tên bài</label><input type="text" id="hlten" maxlength="120" placeholder="VD: Phiếu tô màu buổi ${N} (bản sửa)">
+      <div class="row"><label class="sm">Buổi <input type="number" id="hlb" min="0" max="48" value="${N}" style="width:70px"></label>
+        <label class="sm">Cách đưa cho con <select id="hlc" style="width:auto">${Object.keys(CACH).map(k => `<option value="${k}">${CACH[k]}</option>`).join('')}</select></label></div>
+      <details class="hlkid"><summary class="sm"><b>Cho ai:</b> <span id="hlai">cả lớp</span> (bấm để chọn riêng vài bạn)</summary><div class="chips">${kids.map(k => `<label class="sm hlk"><input type="checkbox" value="${esc(k.id)}"> ${esc(k.ten)}</label>`).join('')}</div></details>
+      <label class="f" for="hlf">File</label><input type="file" id="hlf">
+      <div id="hlto" class="hlto" hidden></div>
+      <label class="f" for="hlu">…hoặc link (Google Drive, YouTube…)</label><input type="url" id="hlu" placeholder="https://drive.google.com/…">
+      <label class="f" for="hlg">Ghi chú cho quản lý lớp</label><input type="text" id="hlg" maxlength="500" placeholder="VD: in màu, mỗi con 1 tờ; phát đầu buổi">
+      <div class="row" style="margin-top:8px"><input type="text" id="hlng" maxlength="40" placeholder="Tên người gửi (tuỳ chọn)" value="${esc(store.get('qtl-ten') || '')}" style="max-width:220px"><button class="btn" type="button" id="hlsend">Gửi quản lý lớp</button></div></details>`;
+    const by = {}; all.forEach(h => { const k = h.buoi === '' ? -1 : h.buoi; (by[k] = by[k] || []).push(h); });
+    const one = h => `<li class="hl ${hlCho(h) ? 'cho' : 'xong'}"><div class="td-h"><b>${esc(h.ten)}</b>${hlCho(h) ? ' <span class="chip a">chờ lấy</span>' : ' <span class="chip g">✓ đã đưa cho con</span>'}</div>
+      <div class="sm muted">${esc(choAi(h))} · ${esc(CACH[h.cach])} · ${h.tu === 'ql' ? 'Quản lý lớp' : 'Giáo viên'}${h.nguoi ? ' (' + esc(h.nguoi) + ')' : ''} gửi ${dmt(h.at)}${h.co_file ? ' · ' + esc(h.file) + ' · ' + MB(h.co) : ' · 🔗 link'}</div>${h.gc ? `<div class="td-nd">${esc(h.gc)}</div>` : ''}
+      <div class="row td-b">${h.co_file ? `<button class="btn sm" type="button" data-hlget="${esc(h.id)}">⬇️ Tải về</button>` : `<a class="btn sm btnlink" href="${esc(h.url)}" target="_blank" rel="noopener">🔗 Mở link</a>`}
+        ${h.cach !== 'zalo' ? `<button class="${h.phat ? 'ghost' : 'ghost'} sm" type="button" data-hlphat="${esc(h.id)}" aria-pressed="${!!h.phat}">${h.phat ? '✅ Đã in phát ' + dmt(h.phat) : '🖨️ Đánh dấu đã in phát'}</button>` : ''}
+        ${h.cach !== 'in' ? `<button class="ghost sm" type="button" data-hlgui="${esc(h.id)}" aria-pressed="${!!h.gui}">${h.gui ? '✅ Đã gửi phụ huynh ' + dmt(h.gui) : '📱 Đánh dấu đã gửi phụ huynh'}</button>${btnCp(tinHl(h), '📋 Chép tin kèm')}` : ''}
+        <button class="ghost sm" type="button" data-hlan="${esc(h.id)}">Ẩn</button></div></li>`;
+    const ks = Object.keys(by).map(Number).sort((a, b) => b - a);
+    const list = all.length ? ks.map(k => `<h3 class="pha">${k < 0 ? 'Không ghi buổi' : 'Buổi ' + k}${k === M.N ? ' · buổi tới' : ''}</h3><ul class="tds">${by[k].map(one).join('')}</ul>`).join('') : '<p class="muted sm">Chưa có học liệu gửi thêm nào.</p>';
+    return (gv ? form : '') + `<div class="card"><h2>Học liệu gửi thêm · ${esc(lopTen())} ${all.filter(hlCho).length ? `<span class="chip r">${all.filter(hlCho).length} chờ lấy</span>` : ''}</h2>
+      <p class="sm muted">${gv ? 'Theo dõi quản lý lớp đã in phát / gửi phụ huynh chưa.' : 'Tải bài về, in phát hoặc gửi phụ huynh, rồi đánh dấu để giáo viên biết.'} "Ẩn" chỉ bỏ khỏi danh sách, file vẫn còn trong Drive.</p>${list}</div>` + (gv ? '' : form.replace(' open', ''));
+  }
+  function bindHl(root) {
+    const f = $('#hlf', root); if (!f) return;
+    const box = $('#hlto', root), ai = () => { const c = $$('.hlk input:checked', root).map(x => x.parentNode.textContent.trim()); $('#hlai', root).textContent = c.length ? c.join(', ') : 'cả lớp'; };
+    $$('.hlk input', root).forEach(x => x.onchange = ai);
+    const qua = (mb) => { box.hidden = false; box.innerHTML = `<b>File ${mb} lớn hơn ${hlMax()} MB nên không tải thẳng lên đây được.</b><ol class="sm"><li>Thả file vào Google Drive của cô.</li><li>Bấm chuột phải vào file → <b>Chia sẻ</b> → mục "Quyền truy cập chung" chọn <b>Bất kỳ ai có đường liên kết</b> → <b>Sao chép đường liên kết</b>.</li><li>Dán link vào ô bên dưới rồi bấm "Gửi quản lý lớp". Link sẽ được gửi cho quản lý lớp.</li></ol>`; f.value = ''; $('#hlu', root).focus(); };
+    f.onchange = () => { const x = f.files[0]; box.hidden = true; if (!x) return; if (x.size > hlMax() * 1048576) return qua(MB(x.size)); if (!$('#hlten', root).value.trim()) $('#hlten', root).value = x.name.replace(/\.[^.]+$/, ''); };
+    $('#hlsend', root).onclick = async () => {
+      const b = $('#hlsend', root), x = f.files[0], url = $('#hlu', root).value.trim(), ten = $('#hlten', root).value.trim();
+      if (!ten) return toast('Đặt tên bài trước nhé'); if (!x && !url) return toast('Chọn file hoặc dán link'); if (!x && !/^https:\/\//.test(url)) return toast('Link phải bắt đầu bằng https://');
+      store.set('qtl-ten', $('#hlng', root).value.trim());
+      const o = { ten, buoi: $('#hlb', root).value, cach: $('#hlc', root).value, ghi_chu: $('#hlg', root).value.trim(), kid: $$('.hlk input:checked', root).map(i => i.value), lh: (lhCur() || {}).id || '', tu: S.vai === 'ql' ? 'ql' : 'gv', nguoi: store.get('qtl-ten') || '' };
+      b.disabled = true; b.textContent = x ? 'Đang tải lên…' : 'Đang gửi…';
+      if (x) { o.file = x.name; o.mime = x.type || 'application/octet-stream'; o.b64 = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] || ''); r.onerror = no; r.readAsDataURL(x); }); } else o.url = url;
+      const r = await call('qt_hl_them', o);
+      if (!r.ok) { b.disabled = false; b.textContent = 'Gửi quản lý lớp'; if (r.qua_lon) return qua(MB(x.size)); return toast(r.err || 'Chưa gửi được'); }
+      toast('Đã gửi quản lý lớp'); refresh(true);
+    };
+  }
+  async function taiHl(id, b) {
+    b.disabled = true; const t = b.textContent; b.textContent = 'Đang tải…';
+    const r = await call('qt_hl_lay', { id }); b.disabled = false; b.textContent = t; if (!r.ok) return toast(r.err || 'Chưa tải được');
+    const bin = atob(r.b64), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([u8], { type: r.mime })); a.download = r.ten || 'hoc-lieu'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  }
+
   /* ---------- sự kiện ---------- */
   const draw0 = draw;
   draw = function () {
@@ -233,6 +304,12 @@
     $$('[data-vai]', root).forEach(b => b.onclick = () => chonVai(b.dataset.vai));
     $$('[data-cp]', root).forEach(b => b.onclick = async () => { const t = b.dataset.cp; try { await navigator.clipboard.writeText(t); toast('Đã chép. Dán vào Zalo nhé.'); } catch (e) { prompt('Chép nội dung này:', t); } });
     $$('[data-gotab]', root).forEach(b => b.onclick = () => { S.tab = b.dataset.gotab; draw(); scrollTo(0, 0); });
+    bindHl(root);
+    const hsua = async (id, o, msg) => { const r = await call('qt_hl_sua', Object.assign({ id }, o)); if (!r.ok) return toast(r.err || 'Chưa lưu được'); toast(msg); refresh(true); };
+    $$('[data-hlget]', root).forEach(b => b.onclick = () => taiHl(b.dataset.hlget, b));
+    $$('[data-hlphat]', root).forEach(b => b.onclick = () => { const on = b.getAttribute('aria-pressed') !== 'true'; hsua(b.dataset.hlphat, { phat: on ? 1 : 0 }, on ? 'Đã đánh dấu in phát' : 'Đã bỏ đánh dấu'); });
+    $$('[data-hlgui]', root).forEach(b => b.onclick = () => { const on = b.getAttribute('aria-pressed') !== 'true'; hsua(b.dataset.hlgui, { gui: on ? 1 : 0 }, on ? 'Đã đánh dấu gửi phụ huynh' : 'Đã bỏ đánh dấu'); });
+    $$('[data-hlan]', root).forEach(b => b.onclick = () => { if (confirm('Ẩn học liệu này khỏi danh sách? (File trong Drive vẫn giữ.)')) hsua(b.dataset.hlan, { an: 1 }, 'Đã ẩn'); });
     $$('[data-tdloai]', root).forEach(b => b.onclick = () => { S.tdLoai = b.dataset.tdloai; const n = $('#tdn').value; keepDraw(); $('.tdgui').open = true; $('#tdn').value = n; });
     $$('[data-tdmau]', root).forEach(b => b.onclick = () => { const M = moc(derive()), k = S.d.kids.find(x => x.id === $('#tdk').value);
       $('#tdn').value = MAU[S.vai][+b.dataset.tdmau].replace(/\{con\}/g, k ? k.ten : '…').replace(/\{buoi\}/g, $('#tdb').value || (M.N != null ? M.N : '')); $('#tdn').focus(); });

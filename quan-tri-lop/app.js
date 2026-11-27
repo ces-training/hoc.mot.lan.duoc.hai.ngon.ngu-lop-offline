@@ -55,7 +55,7 @@ async function load() {
     r = { ok: true, v: 3, cfg: {}, kids: c.kids, awards: c.awards, orders: c.orders, hs: [], bl: [], gc: [], tn: [] };
   }
   if (!r.ok) return r;
-  S.d = r; S.v3 = r.v < 4; S.v5 = r.v >= 5; S.v7 = r.v >= 7; S.v8 = r.v >= 8; r.lh = r.lh || []; r.td = r.td || [];
+  S.d = r; S.v3 = r.v < 4; S.v5 = r.v >= 5; S.v7 = r.v >= 7; S.v8 = r.v >= 8; S.v9 = r.v >= 9; r.lh = r.lh || []; r.td = r.td || []; r.hl = r.hl || [];
   S.lh = store.get('qtl-lh-' + S.lop); if (S.lh && S.lh !== '_none' && !lhOf(S.lh)) S.lh = ''; return r;
 }
 async function refresh(keepScroll) { const y = scrollY; const r = await load(); if (!r.ok) { toast(r.err || 'Chưa tải được'); return; } draw(); if (keepScroll) scrollTo(0, y); }
@@ -124,7 +124,7 @@ function shell() {
 function draw() {
   if (!S.d) return login();
   shell();
-  const m = $('#main'); const f = { tq: vTq, lh: vLh, hs: vHs, dd: vDd, tk: vTk, sq: vSq, tn: vTn, ga: window.vGa }[S.tab] || vTq;
+  const m = $('#main'); const f = { tq: vTq, lh: vLh, hs: vHs, dd: vDd, tk: vTk, sq: vSq, tn: vTn, ga: window.vGa, hl: window.vHl }[S.tab] || vTq;
   m.innerHTML = f();
   document.title = (LOPS[S.lop].ten) + ' · Quản trị lớp offline (bản riêng)';
   bind();
@@ -539,7 +539,13 @@ function mock(q) {
   if (q.pin !== '2468') return { ok: false, err: 'Sai mã PIN' };
   const id = p => p + Math.random().toString(36).slice(2, 8).toUpperCase();
   switch (q.action) {
-    case 'qt_tai': return Object.assign({ ok: true, v: 8, td: [] }, JSON.parse(JSON.stringify(d)));
+    case 'qt_tai': return Object.assign({ ok: true, v: 9, td: [], hl: [], hl_max: 10 }, JSON.parse(JSON.stringify(d)));
+    case 'qt_hl_them': { d.hl = d.hl || []; if (q.b64 && q.b64.length * 0.75 > 10 * 1048576) return { ok: false, err: 'File lớn', qua_lon: true };
+      const kid = (q.kid || []).filter(x => d.kids.some(k => k.id === x)), o = { id: id('H'), lh: q.lh || '', buoi: q.buoi === '' ? '' : +q.buoi, kid, ten: q.ten, file: q.file || '', mime: q.mime || '', co: q.b64 ? Math.round(q.b64.length * 0.75) : 0, url: q.url || '', co_file: !!q.b64, cach: q.cach, gc: q.ghi_chu || '', tu: q.tu, nguoi: q.nguoi || '', at: Date.now(), phat: 0, gui: 0 };
+      if (q.b64) (window.__HLF = window.__HLF || {})[o.id] = { b64: q.b64, mime: q.mime, ten: (o.buoi !== '' ? 'Buổi ' + o.buoi + ' – ' : '') + q.file };
+      d.hl.unshift(o); save(); return { ok: true, hl: o }; }
+    case 'qt_hl_sua': { const t = (d.hl || []).find(x => x.id === q.id); if (!t) return { ok: false, err: 'Không có học liệu này' }; if (q.phat != null) t.phat = +q.phat ? Date.now() : 0; if (q.gui != null) t.gui = +q.gui ? Date.now() : 0; if (+q.an) d.hl = d.hl.filter(x => x !== t); save(); return { ok: true }; }
+    case 'qt_hl_lay': { const f = (window.__HLF || {})[q.id]; return f ? Object.assign({ ok: true }, f) : { ok: false, err: 'Bản xem thử không giữ file sau khi tải lại trang' }; }
     case 'qt_td_them': { d.td = d.td || []; const o = { id: id('T'), lh: q.lh || '', tu: q.tu, den: q.den, loai: q.loai, kid: q.kid || '', buoi: q.buoi, nd: q.noi_dung, han: q.han || '', tt: 'mo', tl: '', ten: q.ten || '', at: Date.now(), xong: 0 }; d.td.unshift(o); save(); return { ok: true, td: o }; }
     case 'qt_td_sua': { const t = (d.td || []).find(x => x.id === q.id); if (!t) return { ok: false, err: 'Không có mục này' }; if (q.tt) { t.tt = q.tt; t.xong = q.tt === 'xong' ? Date.now() : 0; } if (q.tra_loi != null) t.tl = q.tra_loi; d.td = d.td.filter(x => x.tt !== 'xoa'); save(); return { ok: true }; }
     case 'qt_lh_luu': { if (!String(q.ten || '').trim()) return { ok: false, err: 'Chưa có tên lớp' }; if (d.lh.some(x => x.id !== q.id && x.ten.toLowerCase() === String(q.ten).trim().toLowerCase())) return { ok: false, err: 'Khoá này đã có lớp tên như vậy' };
