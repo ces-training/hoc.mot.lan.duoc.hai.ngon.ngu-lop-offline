@@ -4,9 +4,11 @@
       thì hiện ô nhập PIN 4 số; máy thứ 3 trở đi thì hiện màn "chờ cô duyệt". Con chưa có PIN: không hiện gì.
    2) viewBang(): trang "Bảng của con" (#/bang) – con và ba mẹ cùng xem: sao, chuyên cần, mức tham gia từng buổi,
       và CHỈ những nhận xét cô chọn chia sẻ. Không có dữ liệu của bạn khác, không xếp hạng.
+   3) Bản 10: lệnh của con kèm "k" (link riêng của con, không cần PIN) và "ph" (phiên dữ liệu, xem ls-may-chu.js);
+      trang #/bang thành "Báo cáo học tập": ngày con học, từng buổi trên lớp, nhận xét cô chia sẻ, bài cô giao thêm (tải về).
    ===================================================================== */
 const KidAuth = (() => {
-  const ACT = { kid: 1, hello: 1, redeem: 1, tai: 1, luu: 1, bang: 1 };
+  const ACT = { kid: 1, hello: 1, redeem: 1, tai: 1, luu: 1, bang: 1, con_hl_lay: 1 };
   let ov = null, busy = null, snoozeUntil = {};
   function dev() {
     try { let d = localStorage.getItem('sdl-dev'); if (!d || d.length < 8) { d = (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '') : Math.random().toString(36).slice(2) + Date.now().toString(36)).slice(0, 24); localStorage.setItem('sdl-dev', d); } return d; }
@@ -28,7 +30,11 @@ const KidAuth = (() => {
 .bg-tbl{width:100%;border-collapse:collapse;font-size:14px}.bg-tbl th,.bg-tbl td{padding:6px 4px;white-space:nowrap;border-bottom:1px solid #eee;text-align:center}.bg-tbl td:first-child,.bg-tbl th:first-child{text-align:left}
 .bg-sc{overflow-x:auto}.bg-note{border-left:4px solid #7CC576;background:#F3FAF1;border-radius:8px;padding:8px 10px;margin:8px 0}.bg-note small{color:#777;display:block}
 .bg-note.ho_tro{border-color:#F28C00;background:#FFF8E6}.bg-bar{height:12px;background:#eee;border-radius:8px;overflow:hidden}.bg-bar i{display:block;height:100%;background:#7CC576}
-.bg-foot{font-size:12px;color:#777;margin-top:12px}.bg-pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;background:#eee}.bg-pill.c{background:#DFF3DC}.bg-pill.t{background:#FFF1C9}.bg-pill.v{background:#FADBD8}.bg-pill.p{background:#E6E9F5}`;
+.bg-foot{font-size:12px;color:#777;margin-top:12px}
+.bg-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin:6px 0}.bg-cal span{border:2px solid #eee;border-radius:12px;text-align:center;padding:4px 2px;font-size:13px;color:#999;background:#fafafa}.bg-cal span b{display:block;font-size:17px;color:#555}
+.bg-cal span.on{border-color:#7CC576;background:#F3FAF1;color:#2E7D32}.bg-cal span.hn{outline:2px solid #F28C00;outline-offset:1px}
+.bg-hl{display:flex;gap:10px;align-items:center;justify-content:space-between;border:2px dashed #F5D58A;border-radius:14px;padding:8px 10px;margin:8px 0;background:#FFFDF5}.bg-hl small{display:block;color:#777}.bg-hl p{margin:4px 0 0;font-size:14px}
+.bg-dl{width:auto!important;margin:0!important;padding:10px 14px!important;white-space:nowrap;text-decoration:none;text-align:center}.bg-pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;background:#eee}.bg-pill.c{background:#DFF3DC}.bg-pill.t{background:#FFF1C9}.bg-pill.v{background:#FADBD8}.bg-pill.p{background:#E6E9F5}`;
     document.head.appendChild(s);
   }
   function show(html) { css(); if (ov) ov.remove(); ov = document.createElement('div'); ov.className = 'ka-ov'; ov.innerHTML = `<div class="ka-box" role="dialog" aria-modal="true">${html}</div>`; document.body.appendChild(ov); return ov; }
@@ -65,6 +71,8 @@ const KidAuth = (() => {
   async function call(raw, q) {
     if (!ACT[q.action]) return raw(q);
     q = Object.assign({}, q, { dev: dev() });
+    if (typeof linkOf === 'function' && q.id && linkOf(q.id)) q.k = linkOf(q.id);
+    if (typeof P === 'object' && P && q.id === P.kidId) q.ph = +P._ph || 0;
     let r = await raw(q);
     if (!r || (r.need !== 'pin' && r.need !== 'duyet') || !q.id) return r;
     if (Date.now() < (snoozeUntil[q.id] || 0)) return Object.assign({ err: 'Cần nhập PIN của con để dùng ở máy này' }, r);
@@ -73,7 +81,7 @@ const KidAuth = (() => {
     if (!a.ok) { snoozeUntil[q.id] = Date.now() + 90000; return Object.assign({ err: 'Cần nhập PIN của con để dùng ở máy này' }, r); }
     return raw(q);
   }
-  return { call, dev };
+  return { call, dev, css };
 })();
 
 /* ---------- Bảng của con (#/bang) ---------- */
@@ -81,21 +89,35 @@ const BG_TT = { 1: 'đang làm quen', 2: 'khá tốt', 3: 'rất tốt' }, BG_CM
 const BG_LOAI = { tien_bo: '🌱 Tiến bộ', ho_tro: '🤝 Cô gợi ý ở nhà', phu_huynh: '👪 Gửi phụ huynh', hanh_vi: '🧭 Nề nếp', khac: '📝 Nhận xét' };
 async function viewBang() {
   const id = (typeof kidId === 'function') ? kidId() : '';
-  document.body.classList.add('hub'); if (typeof setActive === 'function') setActive('');
-  const frame = b => { app.innerHTML = `<div class="screen qscr"><div class="q-top"><span class="q-back">📒</span><h2>Bảng của con</h2></div><div class="bg-wrap">${b}</div></div>`; };
-  if (!id) return frame('<p>Chưa có mã của con. Ba mẹ mở đường link cô gửi, hoặc bấm nút ❓ ở góc trên để nhập mã.</p>');
+  KidAuth.css(); document.body.classList.add('hub'); if (typeof setActive === 'function') setActive('');
+  const frame = b => { app.innerHTML = `<div class="screen qscr"><div class="q-top"><a class="q-back" href="#/" aria-label="Về trang chủ">📒</a><h2>Báo cáo học tập</h2></div><div class="bg-wrap">${b}</div></div>`; };
+  if (!id) return frame('<p>Ba mẹ mở <b>link riêng của con</b> cô gửi (hoặc quét QR trên thẻ) để xem báo cáo học tập của con.</p>');
   frame('<p>Đang tải…</p>');
   const r = await api({ action: 'bang', id });
   if (!r || !r.ok) return frame(`<p>${esc((r && r.err) || 'Chưa tải được bảng của con.')}</p><p><a href="#/bang" onclick="viewBang();return false">Thử lại</a></p>`);
   const dd = r.buoi.filter(b => b.cm), co = dd.filter(b => b.cm === 'c' || b.cm === 't').length, taught = r.da_day.length || dd.length;
   const pct = dd.length ? Math.round(100 * co / dd.length) : 0, lv = v => v === '' || v == null ? '·' : '🌱'.repeat(+v);
   const sao = (+r.web || 0) + (+r.sao_co || 0);
+  /* học web theo ngày: lịch 14 ngày gần nhất (ngày con mở bài học), số ngày web đã xong */
+  const jd = (P && P._j && P._j.days) || {}, pad2 = n => String(n).padStart(2, '0'), ymd2 = d => d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  const cal = Array.from({ length: 14 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - 13 + i); return d; });
+  const xong = Object.keys((P && P.days) || {}).filter(n => P.days[n] && P.days[n].done).map(Number).sort((a, b) => a - b);
+  const hoc7 = cal.slice(7).filter(d => jd[ymd2(d)]).length;
+  const hl = r.hl || [];
   frame(`<h2>${esc(r.ten)}</h2><p class="bg-sub">Con và ba mẹ cùng xem nhé. Đây là chặng đường của riêng con, không so với bạn nào.</p>
     <div class="bg-tiles"><div class="bg-tile"><b>⭐ ${sao}</b><span>sao (web ${+r.web || 0} + cô tặng ${+r.sao_co || 0})</span></div>
     <div class="bg-tile"><b>${r.ngay}</b><span>ngày đã học trên web</span></div>
     <div class="bg-tile"><b>${co}/${taught || '0'}</b><span>buổi con đã đến lớp</span></div></div>
+    <div class="bg-card"><h3>📅 Con học web theo ngày</h3><div class="bg-cal">${cal.map(d => `<span class="${jd[ymd2(d)] ? 'on' : ''} ${ymd2(d) === ymd2(new Date()) ? 'hn' : ''}"><small>${['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][d.getDay()]}</small><b>${d.getDate()}</b>${jd[ymd2(d)] ? '✓' : ''}</span>`).join('')}</div>
+      <p>7 ngày qua con học <b>${hoc7}</b> ngày. Đã xong <b>${xong.length}</b> ngày web${xong.length ? ` (gần nhất: ngày ${xong[xong.length - 1]})` : ''}. Mỗi ngày một chút, khoảng 12 phút, là cách nhớ lâu nhất.</p></div>
+    <div class="bg-card"><h3>📎 Bài cô giao thêm</h3>${hl.length ? hl.map(h => `<div class="bg-hl"><div><b>${esc(h.ten)}</b><small>${h.buoi !== '' ? 'Buổi ' + h.buoi + ' · ' : ''}${esc(new Date(h.at).toLocaleDateString('vi-VN'))}</small>${h.gc ? `<p>${esc(h.gc)}</p>` : ''}</div>${h.co_file ? `<button class="ka-btn bg-dl" type="button" data-hl="${esc(h.id)}">⬇️ Tải bài</button>` : h.url ? `<a class="ka-btn bg-dl" href="${esc(h.url)}" target="_blank" rel="noopener">🔗 Mở bài</a>` : ''}</div>`).join('') : '<p>Chưa có bài giao thêm. Khi cô giao, bài sẽ hiện ở đây để ba mẹ tải về.</p>'}</div>
     <div class="bg-card"><h3>Đi học đều</h3><div class="bg-bar" aria-label="${pct}%"><i style="width:${pct}%"></i></div><p>${dd.length ? `Con có mặt <b>${pct}%</b> số buổi cô đã ghi.` : 'Cô chưa ghi buổi nào.'} Học web mỗi ngày một chút là cách nhớ lâu nhất.</p></div>
     <div class="bg-card"><h3>Từng buổi trên lớp</h3>${dd.length ? `<div class="bg-sc"><table class="bg-tbl"><thead><tr><th>Buổi</th><th>Đi học</th><th>Tham gia</th><th>Nói Anh</th><th>Nói Trung</th><th>Bài tập</th></tr></thead><tbody>${dd.map(b => { const c = BG_CM[b.cm] || ['', '']; return `<tr><td>${b.buoi}${b.ngay ? `<br><small>${esc(String(b.ngay).slice(5).split('-').reverse().join('/'))}</small>` : ''}</td><td><span class="bg-pill ${c[1]}">${c[0]}</span></td><td>${lv(b.tg)}</td><td>${lv(b.en)}</td><td>${lv(b.zh)}</td><td>${lv(b.bt)}</td></tr>`; }).join('')}</tbody></table></div><p class="bg-foot">🌱 = đang làm quen · 🌱🌱 = khá tốt · 🌱🌱🌱 = rất tốt</p>` : '<p>Cô chưa ghi buổi nào. Khi cô ghi, bảng này sẽ hiện ra.</p>'}</div>
     <div class="bg-card"><h3>Cô nhắn con và ba mẹ</h3>${r.gc.length ? r.gc.map(g => `<div class="bg-note ${esc(g.loai)}"><small>${esc(BG_LOAI[g.loai] || BG_LOAI.khac)}${g.buoi !== '' ? ' · buổi ' + g.buoi : ''} · ${esc(new Date(g.at).toLocaleDateString('vi-VN'))}</small>${esc(g.nd)}</div>`).join('') : '<p>Chưa có lời nhắn. Cô sẽ viết khi con có điều đáng khen hoặc cần cố gắng thêm.</p>'}</div>
-    <p class="bg-foot">🔐 Bảng này chỉ hiện ở máy đã nhập PIN của con. Xin đừng chia sẻ link và PIN cho bạn khác. Đây là thông tin học tập riêng của con.</p>`);
+    <p class="bg-foot">🔐 Báo cáo này chỉ mở được bằng link riêng của con. Xin đừng chia sẻ link cho người khác. Đây là thông tin học tập riêng của con.</p>`);
+  app.querySelectorAll('[data-hl]').forEach(b => b.onclick = async () => { const t = b.textContent; b.disabled = true; b.textContent = 'Đang tải…';
+    const x = await api({ action: 'con_hl_lay', id, hl: b.dataset.hl }); b.disabled = false; b.textContent = t;
+    if (!x || !x.ok) { try { toast((x && x.err) || 'Chưa tải được bài'); } catch (e) {} return; }
+    const bin = atob(x.b64), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([u8], { type: x.mime })); a.download = x.ten || 'bai-cua-con'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000); });
 }

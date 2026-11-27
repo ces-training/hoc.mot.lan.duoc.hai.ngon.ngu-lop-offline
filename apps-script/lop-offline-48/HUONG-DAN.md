@@ -109,3 +109,23 @@ Mỗi con có **mã** (trong link `?con=MÃ`) và **PIN 4 số**. Mỗi con nh�
 - Quản lý lớp thấy số bài chờ trên tab và ở "Việc của tôi"; bấm **Tải về** (tải qua máy chủ, không cần quyền vào Drive), đánh dấu **Đã in phát** / **Đã gửi phụ huynh**, có tin mẫu để chép gửi Zalo. Thẻ "Buổi tới" nhắc buổi đó có bao nhiêu bài thêm.
 - "Ẩn" chỉ bỏ khỏi danh sách, file trong Drive vẫn còn.
 - Cập nhật: dán Code.gs mới → Lưu → chạy `caiDat` (lần này Google có thể hỏi quyền Drive: bấm Cho phép; nhật ký in đường dẫn thư mục học liệu) → Triển khai → Quản lý triển khai → ✏️ → Phiên bản mới. `?action=ping` ra `"v":9` là xong.
+
+## Bản 10: tài khoản nhân sự, link riêng của con, chuyển khoá, báo cáo học tập, làm lại từ đầu
+
+**Có gì mới**
+- Trang quản trị đăng nhập bằng **tên đăng nhập + mật khẩu** (nhớ 30 ngày trên máy), không dùng PIN khoá nữa. Tab **TaiKhoan** chỉ lưu mật khẩu dạng băm có muối.
+  - Quản trị: thấy mọi lớp của cả Little Seed và Seedling, tạo / sửa / khoá tài khoản ở mục **Nhân sự**, giao lớp cho từng người.
+  - Giáo viên, Quản lý học tập: chỉ thấy các lớp được giao; vai cố định theo tài khoản. Giáo viên không chuyển lớp, không tạo tài khoản con.
+- Mỗi con một **link riêng** `.../con/?k=MÃ` (cột `ma_link`): mở là học, không cần PIN; tự mở đúng web Little Seed hay Seedling. Lộ link: bấm **Đổi link** ở mục Tài khoản con.
+- **Chuyển lớp sang khoá khác** (vd. Little Seed → Seedling) ở mục Lớp học: giữ mã con, link, thú cưng, quái vật; sao trong ví thành "sao mang sang"; tiến độ khoá cũ cất ở TienDo mã `MÃ@ls`; web khoá mới học từ ngày 1.
+- Web của con có ô **Báo cáo học tập** trên trang chủ: lịch 14 ngày con học web, số ngày web đã xong, bài cô giao lên web (ba mẹ tải về), từng buổi trên lớp, nhận xét cô chia sẻ.
+  - Bài giao thêm: khi tải lên ở mục Học liệu gửi thêm, giữ dấu tích **🌐 Giao lên web của con** (cột `web` của HocLieu).
+  - Nhận xét: chỉ nhận xét cô bật "chia sẻ" mới hiện (như trước).
+- Hàm **lamLaiTuDau()**: sao lưu cả Sheet, xoá dữ liệu học tập cũ (TienDo, Thuong, DoiQua, BuoiHS, GhiChu; sao, ngày web, máy đã nhớ của từng con), tăng "phiên" để máy nào còn bản cũ tự bỏ. **Giữ** danh sách con, link, lớp, tài khoản, tài nguyên, trao đổi, học liệu.
+
+**Cập nhật (làm theo thứ tự)**
+1. Dán Code.gs mới → Lưu → chạy `caiDat` (tạo tab TaiKhoan, tạo link riêng cho các con) → Triển khai → Quản lý triển khai → ✏️ → Phiên bản mới. `?action=ping` ra `"v":10`.
+2. Mở trang quản trị → bấm **"Lần đầu dùng: tạo tài khoản quản trị bằng PIN khoá"** → nhập PIN khoá (tab CaiDat), họ tên, tên đăng nhập, mật khẩu. Chỉ làm được một lần.
+3. Mục **Nhân sự** → tạo tài khoản cho giáo viên, quản lý học tập, tích các lớp được giao. Thông tin đăng nhập tự chép để dán gửi riêng.
+4. Trong trình soạn Apps Script chọn hàm **`lamLaiTuDau`** → Chạy (một lần). Nhật ký in link bản sao lưu.
+5. Mục **Tài khoản con** → **📋 Chép link** gửi riêng từng ba mẹ, hoặc chọn các con → **In thẻ** (QR mở link riêng).

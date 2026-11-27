@@ -469,7 +469,7 @@ function parentPanel() { const ov = document.createElement('div'); ov.className 
     <p><b>3 KHÔNG:</b> không ép nói, không sửa lỗi, không so sánh. Khen con khi con đang làm bài và khi con xong bài.</p>
     <div class="sx-kidcode"><b>Nối web với lớp</b><span>${kidId() ? `Mã của con: <code>${esc(kidId())}</code>${API_ON ? '' : ' (bản xem thử)'}<small class="sx-cl">${esc(clStatus())} Con đổi sang máy khác: ba mẹ mở lại link cô gửi, hoặc nhập mã này ở máy mới, web tự lấy lại bài con đã học.</small>` : 'Ba mẹ mở đường link cô gửi qua Zalo, hoặc nhập mã cô đưa:'}</span>
       <div class="row"><input id="kidCodeIn" class="q-gate-in" placeholder="Mã của con" autocomplete="off"><button class="btn g sm" id="kidCodeOk" type="button">Lưu mã</button></div>
-      <a class="sx-colink" href="#/bang">📒 Bảng của con: sao, đi học, nhận xét của cô →</a><br><a class="sx-colink" href="#/co">Dành cho cô giáo: Bảng của cô →</a></div></div>`;
+      <a class="sx-colink" href="#/bang">📒 Báo cáo học tập: ngày học, nhận xét của cô, bài giao thêm →</a><br><a class="sx-colink" href="#/co">Dành cho cô giáo: Bảng của cô →</a></div></div>`;
   document.body.appendChild(ov); const close = () => ov.remove(); ov.querySelector('.pp-x').onclick = close; ov.addEventListener('click', e => { if (e.target === ov || e.target.closest('a')) close(); });
   ov.querySelector('#kidCodeOk').onclick = () => { const v = ov.querySelector('#kidCodeIn').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, ''); if (!v) return;
     clSwitch(v); close(); toast('Đã lưu mã của con. Web đang lấy bài và sao của con…'); clPull().then(() => coSync(true)); }; }

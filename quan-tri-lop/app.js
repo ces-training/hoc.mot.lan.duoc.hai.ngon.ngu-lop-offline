@@ -5,6 +5,10 @@
    - Máy chủ cũ (bản 3): vẫn xem được dashboard và sao/quà; điểm danh, ghi chú, tài nguyên cần bản 4.
    - Bản 7 (26/11/2026): LỚP HỌC trong mỗi khoá. Mục "Lớp học" để tạo lớp, xếp và chuyển con giữa các lớp;
      ô "Lớp" trên đầu trang lọc mọi mục theo một lớp; điểm danh, ngày khai giảng ghi riêng cho từng lớp.
+   - Bản 10 (27/11/2026): ĐĂNG NHẬP BẰNG TÀI KHOẢN (tên đăng nhập + mật khẩu, nhớ 30 ngày trên máy), không dùng PIN khoá.
+     Quản trị thấy mọi lớp, tạo tài khoản ở mục "Nhân sự" (nhan-su.js); giáo viên / quản lý học tập chỉ thấy lớp được giao.
+     Mỗi con một link riêng .../con/?k=… (mở là học, không cần PIN). Chuyển lớp sang khoá khác = lên Seedling.
+     ?demo=1: tên đăng nhập demo, mật khẩu 2468.
    ===================================================================== */
 const API = 'https://script.google.com/macros/s/AKfycbxA0_S8xQRc9IpzVcQ06-waH5OT7H5crqr-yFTwmKUij09zf9qPbzRsiX-iCPHnnocz/exec';
 const DEMO = /[?&]demo=1/.test(location.search);
@@ -26,9 +30,10 @@ const dmt = t => { if (!t) return ''; const d = new Date(+t); return pad(d.getDa
 let toastT = 0;
 function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 2600); }
 const store = { get: k => { try { return sessionStorage.getItem(k) || ''; } catch (e) { return ''; } }, set: (k, v) => { try { v ? sessionStorage.setItem(k, v) : sessionStorage.removeItem(k); } catch (e) {} } };
+const keep = { get: k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }, set: (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch (e) {} } };   // nhớ đăng nhập 30 ngày
 
 /* ---------- trạng thái ---------- */
-const S = { lop: store.get('qtl-lop') || 'ls', pin: '', d: null, tab: 'tq', kid: '', q: '', filt: '', dd: null, sel: new Set(), n: 3, why: WHY[0], tnEdit: null, v3: false, v5: false, err: '', tkSel: new Set(), tkNew: '', tkCards: null, v7: false, lh: '', lhEdit: null, lhSel: new Set(), lhFilt: 'pin' };
+const S = { lop: keep.get('qtl-lop') || 'ls', tok: keep.get(DEMO ? 'qtl-tok-demo' : 'qtl-tok'), toi: null, lhAll: [], d: null, tab: 'tq', kid: '', q: '', filt: '', dd: null, sel: new Set(), n: 3, why: WHY[0], tnEdit: null, v3: false, v5: false, err: '', tkSel: new Set(), tkNew: '', tkCards: null, v7: false, lh: '', lhEdit: null, lhSel: new Set(), lhFilt: 'pin' };
 /* lớp học đang xem: '' = cả khoá, '_none' = các bạn chưa xếp lớp, còn lại là mã lớp */
 const LH = () => (S.d && S.d.lh) || [];
 const lhOf = id => LH().find(x => x.id === id);
@@ -42,10 +47,13 @@ const weekOf = n => n <= 3 ? n : 4 + Math.floor((n - 4) / 2);   // tuần 1–3:
 
 /* ---------- gọi máy chủ (POST text/plain: không cần hỏi trước, PIN không nằm trên link) ---------- */
 async function call(action, extra = {}) {
-  const q = Object.assign({ action, lop: S.lop, pin: S.pin }, extra);
-  if (DEMO) return mock(q);
-  try { const r = await fetch(API, { method: 'POST', body: JSON.stringify(q), redirect: 'follow' }); return await r.json(); }
+  const q = Object.assign({ action, lop: S.lop, tok: S.tok }, extra);
+  let r;
+  if (DEMO) r = mock(q);
+  else try { r = await (await fetch(API, { method: 'POST', body: JSON.stringify(q), redirect: 'follow' })).json(); }
   catch (e) { return { ok: false, err: 'Không nối được máy chủ. Kiểm tra mạng rồi thử lại.', net: true }; }
+  if (r && r.het && S.d && !/^qt_(dn|tk_dau)$/.test(action)) { setTok(''); S.d = null; setTimeout(() => login(r.err), 0); }
+  return r;
 }
 async function load() {
   let r = await call('qt_tai');
@@ -55,8 +63,9 @@ async function load() {
     r = { ok: true, v: 3, cfg: {}, kids: c.kids, awards: c.awards, orders: c.orders, hs: [], bl: [], gc: [], tn: [] };
   }
   if (!r.ok) return r;
+  S.toi = r.toi || S.toi; S.lhAll = r.lh_all || [];
   S.d = r; S.v3 = r.v < 4; S.v5 = r.v >= 5; S.v7 = r.v >= 7; S.v8 = r.v >= 8; S.v9 = r.v >= 9; r.lh = r.lh || []; r.td = r.td || []; r.hl = r.hl || [];
-  S.lh = store.get('qtl-lh-' + S.lop); if (S.lh && S.lh !== '_none' && !lhOf(S.lh)) S.lh = ''; return r;
+  S.lh = keep.get('qtl-lh-' + S.lop); if (S.lh && S.lh !== '_none' && !lhOf(S.lh)) S.lh = ''; return r;
 }
 async function refresh(keepScroll) { const y = scrollY; const r = await load(); if (!r.ok) { toast(r.err || 'Chưa tải được'); return; } draw(); if (keepScroll) scrollTo(0, y); }
 
@@ -106,11 +115,11 @@ function flags(D) {
 /* ---------- vỏ trang ---------- */
 function shell() {
   $('#top').hidden = false;
-  $('#lopsw').innerHTML = Object.keys(LOPS).map(l => `<button class="pill" role="tab" aria-selected="${l === S.lop}" data-lop="${l}" type="button">${LOPS[l].ten}</button>`).join('');
+  $('#lopsw').innerHTML = khoaCuaToi().map(l => `<button class="pill" role="tab" aria-selected="${l === S.lop}" data-lop="${l}" type="button">${LOPS[l].ten}</button>`).join('');
   const lp = $('#lhpick'); if (lp) { const ls = LH(); lp.hidden = !(S.v7 && ls.length);
     const cnt = id => S.d.kids.filter(k => !k.tt && (id === '_none' ? !k.lh || !lhOf(k.lh) : k.lh === id)).length;
     lp.innerHTML = `<label for="lhsel">Lớp</label><select id="lhsel"><option value="">Cả khoá (${S.d.kids.filter(k => !k.tt).length} bạn)</option>${ls.map(l => `<option value="${esc(l.id)}" ${S.lh === l.id ? 'selected' : ''}>${esc(l.ten)} (${cnt(l.id)})</option>`).join('')}<option value="_none" ${S.lh === '_none' ? 'selected' : ''}>Chưa xếp lớp (${cnt('_none')})</option></select>`;
-    $('#lhsel').onchange = e => { S.lh = e.target.value; store.set('qtl-lh-' + S.lop, S.lh); S.kid = ''; S.dd = null; S.sel = new Set(); draw(); }; }
+    $('#lhsel').onchange = e => { S.lh = e.target.value; keep.set('qtl-lh-' + S.lop, S.lh); S.kid = ''; S.dd = null; S.sel = new Set(); draw(); }; }
   const ord = S.d ? S.d.orders.filter(o => o.st === 'cho').length : 0;
   const chm = S.d && S.v5 ? S.d.kids.filter(k => !k.tt && (k.cho || []).length).length : 0;
   $('#nav').innerHTML = TABS.map(([k, t]) => `<button type="button" data-tab="${k}" ${S.tab === k ? 'aria-current="page"' : ''}>${t}${k === 'sq' && ord ? `<span class="dot">${ord}</span>` : ''}${k === 'tk' && chm ? `<span class="dot">${chm}</span>` : ''}</button>`).join('');
@@ -124,27 +133,47 @@ function shell() {
 function draw() {
   if (!S.d) return login();
   shell();
-  const m = $('#main'); const f = { tq: vTq, lh: vLh, hs: vHs, dd: vDd, tk: vTk, sq: vSq, tn: vTn, ga: window.vGa, hl: window.vHl }[S.tab] || vTq;
+  const m = $('#main'); const f = { tq: vTq, lh: vLh, hs: vHs, dd: vDd, tk: vTk, sq: vSq, tn: vTn, ga: window.vGa, hl: window.vHl, nv: window.vNv }[S.tab] || vTq;
   m.innerHTML = f();
   document.title = (LOPS[S.lop].ten) + ' · Quản trị lớp offline (bản riêng)';
   bind();
 }
 
-/* ---------- đăng nhập ---------- */
+/* ---------- đăng nhập bằng tài khoản (bản 10) ---------- */
+function setTok(t) { S.tok = t; keep.set(DEMO ? 'qtl-tok-demo' : 'qtl-tok', t); }
+/* các khoá tài khoản này vào được: quản trị = cả hai; còn lại = khoá có lớp được giao */
+const khoaCuaToi = () => (!S.toi || S.toi.vai === 'qt') ? Object.keys(LOPS) : Object.keys(LOPS).filter(l => S.lhAll.some(x => x.khoa === l));
 function login(err) {
-  $('#top').hidden = true; $('#banner').hidden = !DEMO; if (DEMO) $('#banner').textContent = 'Chế độ xem thử: PIN là 2468, dữ liệu giả lưu trên máy này.';
-  $('#main').innerHTML = `<div class="card login"><h1>Quản trị lớp offline · bản riêng</h1><p class="muted">Dành cho cô giáo. Chọn lớp rồi nhập PIN của lớp (PIN nằm ở tab CaiDat của Google Sheet quản lý).</p>
-    <div class="lopsw" role="tablist">${Object.keys(LOPS).map(l => `<button class="pill" role="tab" aria-selected="${l === S.lop}" data-lop0="${l}" type="button">${LOPS[l].ten}</button>`).join('')}</div>
-    <form id="lf"><label class="f" for="pin">PIN lớp ${esc(LOPS[S.lop].ten)}</label><input id="pin" type="password" inputmode="numeric" autocomplete="off" autofocus>
-    <div class="err" id="lerr" role="alert">${esc(err || '')}</div><button class="btn" type="submit" style="width:100%">Vào quản trị</button></form></div>`;
-  $$('[data-lop0]').forEach(b => b.onclick = () => { S.lop = b.dataset.lop0; store.set('qtl-lop', S.lop); S.pin = store.get('qtl-pin-' + S.lop); S.pin ? enter() : login(); });
-  $('#lf').onsubmit = async e => { e.preventDefault(); S.pin = $('#pin').value.trim(); if (!S.pin) return; await enter(); };
+  $('#top').hidden = true; $('#banner').hidden = !DEMO; if (DEMO) $('#banner').textContent = 'Chế độ xem thử: tên đăng nhập demo, mật khẩu 2468. Dữ liệu giả lưu trên máy này.';
+  $('#main').innerHTML = `<div class="card login"><h1>Quản trị lớp offline · bản riêng</h1><p class="muted">Dành cho giáo viên, quản lý học tập và quản trị CES. Đăng nhập bằng tài khoản quản trị đã cấp.</p>
+    <form id="lf"><label class="f" for="lu">Tên đăng nhập</label><input id="lu" autocomplete="username" autocapitalize="none" spellcheck="false" value="${DEMO ? 'demo' : ''}" autofocus>
+    <label class="f" for="lp">Mật khẩu</label><input id="lp" type="password" autocomplete="current-password">
+    <div class="err" id="lerr" role="alert">${esc(err || '')}</div><button class="btn" type="submit" style="width:100%">Vào quản trị</button></form>
+    <details class="dau"><summary class="sm">Lần đầu dùng: tạo tài khoản quản trị bằng PIN khoá</summary>
+      <p class="muted sm">Chỉ dùng một lần, khi chưa có tài khoản quản trị nào. PIN khoá nằm ở tab CaiDat của Google Sheet quản lý. Sau đó vào trang bằng tài khoản, tạo tài khoản cho giáo viên, quản lý học tập ở mục <b>Nhân sự</b>.</p>
+      <form id="df"><div class="lopsw" role="tablist">${Object.keys(LOPS).map(l => `<button class="pill" role="tab" aria-selected="${l === S.lop}" data-lop0="${l}" type="button">PIN ${LOPS[l].ten}</button>`).join('')}</div>
+      <label class="f" for="dpin">PIN khoá ${esc(LOPS[S.lop].ten)}</label><input id="dpin" type="password" inputmode="numeric" autocomplete="off">
+      <label class="f" for="dten">Họ tên</label><input id="dten" autocomplete="name">
+      <label class="f" for="du">Tên đăng nhập (chữ không dấu, số, dấu chấm)</label><input id="du" autocomplete="username" autocapitalize="none" spellcheck="false">
+      <label class="f" for="dp">Mật khẩu (ít nhất 6 ký tự)</label><input id="dp" type="password" autocomplete="new-password">
+      <label class="f" for="dp2">Nhập lại mật khẩu</label><input id="dp2" type="password" autocomplete="new-password">
+      <div class="err" id="derr" role="alert"></div><button class="btn" type="submit" style="width:100%">Tạo tài khoản quản trị</button></form></details></div>`;
+  $$('[data-lop0]').forEach(b => b.onclick = () => { S.lop = b.dataset.lop0; keep.set('qtl-lop', S.lop); login(); $('.dau').open = true; });
+  $('#lf').onsubmit = async e => { e.preventDefault(); const u = $('#lu').value.trim(), p = $('#lp').value; if (!u || !p) return;
+    const b = $('#lf button'); b.disabled = true; b.textContent = 'Đang vào…';
+    const r = await call('qt_dn', { u, p }); if (!r.ok) { b.disabled = false; b.textContent = 'Vào quản trị'; $('#lerr').textContent = r.err || 'Chưa vào được'; return; }
+    setTok(r.tok); S.toi = r.toi; enter(); };
+  $('#df').onsubmit = async e => { e.preventDefault(); const er = $('#derr');
+    if ($('#dp').value !== $('#dp2').value) { er.textContent = 'Hai lần mật khẩu chưa giống nhau'; return; }
+    const r = await call('qt_tk_dau', { pin: $('#dpin').value.trim(), ho_ten: $('#dten').value.trim(), ten_dn: $('#du').value.trim(), p: $('#dp').value });
+    if (!r.ok) { er.textContent = r.err || 'Chưa tạo được'; return; } setTok(r.tok); S.toi = r.toi; toast('Đã tạo tài khoản quản trị'); enter(); };
 }
-async function enter() {
-  const btn = $('#lf button'); if (btn) { btn.disabled = true; btn.textContent = 'Đang vào…'; }
-  const r = await load();
-  if (!r.ok) { if (!r.net) { S.pin = ''; store.set('qtl-pin-' + S.lop, ''); } S.d = null; return login(r.err || 'Chưa vào được'); }
-  store.set('qtl-pin-' + S.lop, S.pin); S.kid = ''; S.dd = null; S.sel = new Set(); S.lhSel = new Set(); S.lhEdit = null; draw();
+async function enter(lan) {
+  let r = await load();
+  if (!r.ok && r.khong_lop && !lan) { const kh = Object.keys(LOPS).find(l => l !== S.lop); S.lop = kh; keep.set('qtl-lop', kh); return enter(1); }
+  if (!r.ok) { S.d = null; if (r.het) setTok(''); return login(r.het ? '' : (r.err || 'Chưa vào được')); }
+  if (!khoaCuaToi().includes(S.lop) && khoaCuaToi().length) { S.lop = khoaCuaToi()[0]; keep.set('qtl-lop', S.lop); return enter(1); }
+  S.kid = ''; S.dd = null; S.sel = new Set(); S.lhSel = new Set(); S.lhEdit = null; draw();
 }
 
 /* =====================================================================
@@ -210,7 +239,7 @@ function vHs() {
   return `<div class="split ${S.kid ? 'has-kid' : ''}">${left}<div class="kdetail">${S.kid && D.kids.some(k => k.id === S.kid) ? kidDetail(D) : '<div class="card"><div class="empty">Chọn một bạn ở danh sách để xem hồ sơ, điểm danh từng buổi và ghi chú.</div></div>'}</div></div>`;
 }
 function kidDetail(D) {
-  const k = D.kids.find(x => x.id === S.kid), i = D.info[k.id], tong = LOPS[S.lop].tong, link = location.origin + location.pathname.replace(/quan-tri-lop\/.*$/, '') + (S.lop === 'ls' ? 'little-seed/' : 'seedling/') + '?con=' + k.id;
+  const k = D.kids.find(x => x.id === S.kid), i = D.info[k.id], tong = LOPS[S.lop].tong, link = kidLink(k.id);
   const recs = Object.values(D.hsBy[k.id] || {}).sort((a, b) => b.buoi - a.buoi);
   const notes = S.d.gc.filter(g => g.kid === k.id), awards = S.d.awards.filter(a => a.kid === k.id && !a.huy);
   const f = x => x == null ? '–' : x.toFixed(1);
@@ -332,11 +361,16 @@ function vTn() {
 /* =====================================================================
    LỚP HỌC (bản 7): tạo lớp, xếp lớp, chuyển lớp
    ===================================================================== */
-function lhOpts(cur) { return `<option value="" ${!cur || !lhOf(cur) ? 'selected' : ''}>Chưa xếp lớp</option>` + LH().map(l => `<option value="${esc(l.id)}" ${cur === l.id ? 'selected' : ''}>${esc(l.ten)}</option>`).join(''); }
+const lhKhac = () => S.lhAll.filter(l => l.khoa !== S.lop);   // lớp của khoá kia: chuyển sang = chuyển khoá
+function lhOpts(cur) { const kh = lhKhac();
+  return `<option value="" ${!cur || !lhOf(cur) ? 'selected' : ''}>Chưa xếp lớp</option><optgroup label="${esc(LOPS[S.lop].ten)}">` + LH().map(l => `<option value="${esc(l.id)}" ${cur === l.id ? 'selected' : ''}>${esc(l.ten)}</option>`).join('') + '</optgroup>'
+    + (kh.length ? `<optgroup label="Chuyển khoá → ${esc(LOPS[kh[0].khoa].ten)}">` + kh.map(l => `<option value="${esc(l.id)}">${esc(LOPS[l.khoa].ten)} · ${esc(l.ten)}</option>`).join('') + '</optgroup>' : ''); }
 async function moveKids(ids, lh) {
   if (!ids.length) return toast('Chọn ít nhất một bạn');
+  const x = lhKhac().find(l => l.id === lh);
+  if (x && !confirm(`Chuyển ${ids.length} bạn sang ${LOPS[x.khoa].ten} · ${x.ten}?\n\n• Sao trong ví, thú cưng, quái vật được giữ.\n• Tiến độ ${LOPS[S.lop].ten} cất làm lịch sử; web ${LOPS[x.khoa].ten} học từ ngày 1.\n• Link riêng của con giữ nguyên, tự mở web mới.`)) return;
   const r = await call('qt_chuyen', { ids, lh }); if (!r.ok) return toast(r.err || 'Chưa chuyển được');
-  toast(lh ? `Đã xếp ${r.n} bạn vào lớp ${lhName(lh)}` : `Đã đưa ${r.n} bạn về "Chưa xếp lớp"`); S.lhSel = new Set(); refresh(true);
+  toast(x ? `Đã chuyển ${r.n} bạn sang ${LOPS[x.khoa].ten} · ${x.ten}` : lh ? `Đã xếp ${r.n} bạn vào lớp ${lhName(lh)}` : `Đã đưa ${r.n} bạn về "Chưa xếp lớp"`); S.lhSel = new Set(); refresh(true);
 }
 function vLh() {
   if (!S.v7) return `<div class="card"><h2>Lớp học</h2><p>Mục này cần máy chủ bản 7. Cô mở Google Sheet quản lý → <b>Tiện ích mở rộng → Apps Script</b>, dán Code.gs mới, rồi <b>Triển khai → Quản lý triển khai → ✏️ → Phiên bản mới → Triển khai</b>. Link máy chủ giữ nguyên.</p></div>`;
@@ -447,10 +481,10 @@ function bindTn(root) {
     if (!r.ok) return toast(r.err || 'Chưa lưu được'); S.tnEdit = null; toast('Đã lưu link'); refresh(true); };
 }
 document.addEventListener('click', e => {
-  const l = e.target.closest('[data-lop]'); if (l) { const v = l.dataset.lop; if (v === S.lop) return; S.lop = v; store.set('qtl-lop', v); S.pin = store.get('qtl-pin-' + v); S.d = null; S.kid = ''; S.dd = null; S.sel = new Set(); S.tnEdit = null; S.pin ? enter() : login(); return; }
+  const l = e.target.closest('[data-lop]'); if (l) { const v = l.dataset.lop; if (v === S.lop) return; S.lop = v; keep.set('qtl-lop', v); S.d = null; S.kid = ''; S.dd = null; S.sel = new Set(); S.tnEdit = null; enter(1); return; }
   const t = e.target.closest('[data-tab]'); if (t) { S.tab = t.dataset.tab; if (S.tab === 'hs') S.kid = S.kid; draw(); scrollTo(0, 0); }
 });
-$('#logout').onclick = () => { store.set('qtl-pin-' + S.lop, ''); S.pin = ''; S.d = null; login(); };
+$('#logout').onclick = () => { setTok(''); S.d = null; S.toi = null; login(); };
 
 /* =====================================================================
    MÁY CHỦ GIẢ cho ?demo=1 (localStorage)
@@ -458,7 +492,8 @@ $('#logout').onclick = () => { store.set('qtl-pin-' + S.lop, ''); S.pin = ''; S.
 /* =====================================================================
    TÀI KHOẢN CÁC CON: PIN 4 số, máy đã nhớ, in thẻ (có QR)
    ===================================================================== */
-const kidLink = id => location.origin + location.pathname.replace(/quan-tri-lop\/.*$/, '') + (S.lop === 'ls' ? 'little-seed/' : 'seedling/') + '?con=' + id;
+const kidLink = id => { const k = (S.d && S.d.kids.find(x => x.id === id)) || {}, base = location.origin + location.pathname.replace(/quan-tri-lop\/.*$/, '');
+  return k.link ? base + 'con/?k=' + k.link : base + (S.lop === 'ls' ? 'little-seed/' : 'seedling/') + '?con=' + id; };   // bản 10: link riêng của con
 const uaShort = m => (m && m.ua) || 'máy';
 const tAgo = t => { if (!t) return ''; const n = Math.round((Date.now() - t) / 864e5); return n <= 0 ? 'hôm nay' : n + ' ngày trước'; };
 function vTk() {
@@ -468,21 +503,20 @@ function vTk() {
   const rows = kids.map(k => { const cho = k.cho || [], may = k.may || [];
     return `<tr class="${cho.length ? 'wait' : ''}"><td><input type="checkbox" data-tksel="${esc(k.id)}" ${S.tkSel.has(k.id) ? 'checked' : ''} aria-label="Chọn ${esc(k.ten)}"></td>
       <td><b>${esc(k.ten)}</b><br><span class="muted sm">${esc(k.id)}</span></td>
-      <td>${k.pin ? `<code class="pin">${esc(k.pin)}</code>` : '<span class="chip a">chưa có PIN</span>'}</td>
-      <td>${k.pin ? `${may.length}/${mm} máy${may.map(m => `<div class="muted sm">${esc(uaShort(m))} · ${tAgo(m.at)} <button class="ghost sm" type="button" data-maygo="${esc(k.id)}|${esc(m.d)}" aria-label="Gỡ máy">Gỡ</button></div>`).join('')}` : '<span class="muted sm">học như cũ</span>'}
+      <td>${k.link ? `<code class="lnk">${esc(kidLink(k.id).replace(/^https?:\/\//, ''))}</code><div class="row" style="gap:4px;margin-top:4px"><button class="ghost sm" type="button" data-lkcp="${esc(k.id)}">📋 Chép link</button><button class="ghost sm" type="button" data-lknew="${esc(k.id)}">Đổi link</button></div>` : `<button class="ghost sm" type="button" data-lknew="${esc(k.id)}">Tạo link riêng</button>`}
         ${cho.map(m => `<div class="chip b wrapchip">⏳ ${esc(uaShort(m))} xin vào <button class="ghost sm" type="button" data-mayok="${esc(k.id)}|${esc(m.d)}">Duyệt</button> <button class="ghost sm" type="button" data-mayno="${esc(k.id)}|${esc(m.d)}">Từ chối</button></div>`).join('')}</td>
-      <td>${k.pin ? `<button class="ghost sm" type="button" data-pinnew="${esc(k.id)}">PIN mới</button>` : `<button class="ghost sm" type="button" data-pinnew="${esc(k.id)}">Cấp PIN</button>`}</td></tr>`; }).join('');
+      <td class="sm muted">${k.cuoi ? 'học web ' + dm(k.cuoi) : 'chưa mở web'}${(k.lich_su || []).length ? `<br>đã học ${k.lich_su.map(x => esc(LOPS[x.lop] ? LOPS[x.lop].ten : x.lop) + ' ' + x.ngay + ' ngày').join(', ')}` : ''}</td></tr>`; }).join('');
   return `<div class="card"><h2>Tài khoản các con · ${LOPS[S.lop].ten}</h2>
-    <p class="muted">Mỗi con có <b>mã riêng</b> (trong link) và <b>PIN 4 số</b>. Mỗi con dùng được tối đa <b>${mm} máy</b> (ví dụ điện thoại ba/mẹ và máy tính bảng). Máy thứ ${mm + 1} sẽ hiện ở đây để cô duyệt. Nhập sai PIN 5 lần thì khoá 10 phút. Con chưa có PIN vẫn học như cũ.</p>
+    <p class="muted">Mỗi con có <b>một link riêng</b>. Ba mẹ mở link (hoặc quét QR trên thẻ) là vào học ngay, không cần đăng nhập; tiến độ lưu theo con, đổi máy vẫn giữ. Link tự mở đúng web Little Seed hay Seedling, kể cả sau khi con chuyển khoá. Lộ link thì bấm <b>Đổi link</b>: link cũ hết dùng.</p>
     <div class="row"><textarea id="tkNew" rows="3" placeholder="Dán danh sách tên, mỗi dòng một bạn (chỉ tên gọi ở lớp)" style="flex:1;min-width:200px">${esc(S.tkNew)}</textarea><button class="btn" type="button" id="tkAdd">➕ Tạo tài khoản</button></div>
     ${S.v7 && LH().length ? `<p class="muted sm">${lc ? `Các bạn mới sẽ vào lớp <b>${esc(lc.ten)}</b>.` : 'Các bạn mới chưa có lớp. Chọn một lớp ở ô <b>Lớp</b> trên đầu trang trước khi tạo để xếp luôn, hoặc xếp sau ở mục Lớp học.'}</p>` : ''}
     <p class="muted sm">Lưu ý: chỉ nhập tên gọi ở lớp. Cô nên xin ba mẹ đồng ý cho con dùng web và lưu tiến độ học (có thể ghi sẵn vào phiếu đăng ký).</p></div>
   <div class="card"><div class="row"><h3 class="grow">Danh sách (${kids.length})</h3>
     <button class="ghost" type="button" id="tkAll">${sel.length === kids.length && kids.length ? 'Bỏ chọn hết' : 'Chọn hết'}</button>
-    ${noPin.length ? `<button class="ghost" type="button" id="tkPinAll">Cấp PIN cho ${noPin.length} bạn chưa có</button>` : ''}
+    ${kids.some(k => !k.link) ? `<button class="ghost" type="button" id="tkLinkAll">Tạo link cho ${kids.filter(k => !k.link).length} bạn chưa có</button>` : ''}
     <button class="btn" type="button" id="tkPrint" ${sel.length ? '' : 'disabled'}>🖨️ In thẻ (${sel.length})</button></div>
-    ${kids.length ? `<div class="att-scroll"><table class="tbl tk"><thead><tr><th></th><th>Con</th><th>PIN</th><th>Máy</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : '<div class="empty">Chưa có bạn nào.</div>'}
-    <p class="muted sm">PIN chỉ hiện trên trang này (cô đã đăng nhập). Đổi PIN sẽ xoá các máy đã nhớ, con nhập PIN mới ở lần mở sau. In thẻ rồi giao cho ba mẹ qua Zalo hoặc phát tại lớp, đừng đăng PIN lên nhóm chung.</p></div>`;
+    ${kids.length ? `<div class="att-scroll"><table class="tbl tk"><thead><tr><th></th><th>Con</th><th>Link riêng</th><th>Học web</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<div class="empty">Chưa có bạn nào.</div>'}
+    <p class="muted sm">Gửi link riêng cho từng ba mẹ qua Zalo (nhắn riêng) hoặc in thẻ có QR phát tại lớp. Đừng đăng link lên nhóm chung: ai có link là vào được bài của con.</p></div>`;
 }
 function bindTk(root) {
   if (!S.v5) return;
@@ -492,6 +526,11 @@ function bindTk(root) {
     S.tkNew = ''; (r.kids || []).forEach(k => S.tkSel.add(k.id)); toast(`Đã tạo ${r.kids.length} tài khoản. Các bạn mới đã được chọn sẵn để in thẻ.`); refresh(true); };
   $$('[data-tksel]', root).forEach(c => c.onchange = () => { c.checked ? S.tkSel.add(c.dataset.tksel) : S.tkSel.delete(c.dataset.tksel); draw(); });
   const all = $('#tkAll', root); if (all) all.onclick = () => { const ks = S.d.kids.filter(k => !k.tt && inLh(k)); if (ks.every(k => S.tkSel.has(k.id))) S.tkSel.clear(); else ks.forEach(k => S.tkSel.add(k.id)); draw(); };
+  const la = $('#tkLinkAll', root); if (la) la.onclick = async () => { const ids = S.d.kids.filter(k => !k.tt && inLh(k) && !k.link).map(k => k.id); const r = await call('qt_link', { ids }); if (!r.ok) return toast(r.err || 'Chưa tạo được'); toast(`Đã tạo link cho ${r.kids.length} bạn`); refresh(true); };
+  $$('[data-lkcp]', root).forEach(b => b.onclick = async () => { const k = S.d.kids.find(x => x.id === b.dataset.lkcp); const t = `Link học web của ${k.ten}: ${kidLink(k.id)}\nBa mẹ mở link này là con vào học ngay, không cần đăng nhập. Xin giữ link riêng cho con nhé.`;
+    try { await navigator.clipboard.writeText(t); toast('Đã chép link của ' + k.ten); } catch (e) { prompt('Chép link:', kidLink(k.id)); } });
+  $$('[data-lknew]', root).forEach(b => b.onclick = async () => { const k = S.d.kids.find(x => x.id === b.dataset.lknew); if (k.link && !confirm(`Đổi link của ${k.ten}? Link cũ sẽ không vào được nữa, cần gửi link mới cho ba mẹ.`)) return;
+    const r = await call('qt_link', { ids: [k.id] }); if (!r.ok) return toast(r.err || 'Chưa đổi được'); toast('Đã tạo link mới cho ' + k.ten); refresh(true); });
   const pa = $('#tkPinAll', root); if (pa) pa.onclick = async () => { const r = await call('qt_pin', { mode: 'moi', tat_ca: '1' }); if (!r.ok) return toast(r.err || 'Chưa cấp được'); (r.kids || []).forEach(k => S.tkSel.add(k.id)); toast(`Đã cấp PIN cho ${r.kids.length} bạn`); refresh(true); };
   $$('[data-pinnew]', root).forEach(b => b.onclick = async () => { const k = S.d.kids.find(x => x.id === b.dataset.pinnew); if (k.pin && !confirm(`Đổi PIN của ${k.ten}? Các máy đã nhớ sẽ bị xoá, con phải nhập PIN mới.`)) return;
     const r = await call('qt_pin', { mode: 'moi', ids: k.id }); if (!r.ok) return toast(r.err || 'Chưa đổi được'); S.tkSel.add(k.id); toast(`PIN mới của ${k.ten}: ${r.kids[0].pin}`); refresh(true); });
@@ -507,24 +546,24 @@ function qrSvg(text) {
 }
 function printCards(kids) {
   if (!kids.length) return;
-  const miss = kids.filter(k => !k.pin); if (miss.length && !confirm(`${miss.length} bạn chưa có PIN (thẻ sẽ không có PIN). Vẫn in?`)) return;
+  const miss = kids.filter(k => !k.link); if (miss.length && !confirm(`${miss.length} bạn chưa có link riêng (thẻ dùng link cũ, phải nhập PIN). Vẫn in?`)) return;
   let box = $('#printarea'); if (!box) { box = document.createElement('div'); box.id = 'printarea'; document.body.appendChild(box); }
   const mm = S.d.max_may || 2;
   box.innerHTML = kids.map(k => `<div class="pcard"><div class="pc-h"><b>${esc(LOPS[S.lop].ten)} · Anh – Trung</b><span>Thẻ học web của ${esc(k.ten)}</span></div>
-    <div class="pc-b"><div class="pc-qr">${qrSvg(kidLink(k.id))}</div><div class="pc-t"><div>Mã: <b>${esc(k.id)}</b></div>${k.pin ? `<div>PIN: <b class="pc-pin">${esc(k.pin)}</b></div>` : ''}<small>Quét mã QR hoặc mở link cô gửi, nhập PIN lần đầu ở mỗi máy.</small></div></div>
-    <p>Dùng được trên ${mm} máy. Xin ba mẹ giữ PIN riêng cho con, đừng chia sẻ link hay PIN cho bạn khác. Bảng của con (sao, đi học, nhận xét của cô) ở nút ❓ → Bảng của con.</p></div>`).join('');
+    <div class="pc-b"><div class="pc-qr">${qrSvg(kidLink(k.id))}</div><div class="pc-t"><div>Con: <b>${esc(k.ten)}</b></div><small>${k.link ? 'Quét mã QR hoặc mở link cô gửi là vào học ngay, không cần đăng nhập.' : 'Quét mã QR rồi nhập PIN ' + esc(k.pin || '') + ' lần đầu ở mỗi máy.'}</small></div></div>
+    <p>Xin ba mẹ giữ thẻ và link riêng cho con, đừng chia sẻ cho bạn khác. <b>Báo cáo học tập</b> (ngày học, nhận xét của cô, bài cô giao thêm) ở ô Báo cáo học tập trên trang chủ.</p></div>`).join('');
   document.body.classList.add('printing'); setTimeout(() => { window.print(); }, 80);
 }
 window.addEventListener('afterprint', () => { document.body.classList.remove('printing'); const b = $('#printarea'); if (b) b.innerHTML = ''; });
 
-function mockDb() {
-  const key = 'qtl-demo-' + S.lop; let d; try { d = JSON.parse(localStorage.getItem(key)); } catch (e) {}
+function mockDb(L) {
+  L = L || S.lop; const key = 'qtl-demo-' + L; let d; try { d = JSON.parse(localStorage.getItem(key)); } catch (e) {}
   if (d) return d;
-  let seed = S.lop === 'ls' ? 7 : 19; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
-  const names = S.lop === 'ls' ? ['Minh An', 'Gia Khôi', 'Bảo Linh', 'Tuệ Lâm', 'Hà My', 'Đức Anh', 'Khánh Vy', 'Nhật Minh', 'Bảo Châu', 'Quang Huy'] : ['Phương Anh', 'Hải Đăng', 'Ngọc Mai', 'Tùng Lâm', 'Gia Hân', 'Bảo Nam', 'Diệp Chi', 'Anh Khoa'];
-  const now = Date.now(); d = { max_may: 2, lh: [{ id: 'LDEMO1', ten: LOPS[S.lop].ten + ' · Thứ 7 sáng (ví dụ)', lich: 'Thứ 4 18:00 và Thứ 7 9:00', khai_giang: '', ghi_chu: '' }], kids: [], awards: [], orders: [], hs: [], bl: [], gc: [], tn: [], cfg: { ten_lop: LOPS[S.lop].ten, khai_giang: ymd(new Date(now - 17 * 864e5)) }, seq: 1 };
+  let seed = L === 'ls' ? 7 : 19; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  const names = L === 'ls' ? ['Minh An', 'Gia Khôi', 'Bảo Linh', 'Tuệ Lâm', 'Hà My', 'Đức Anh', 'Khánh Vy', 'Nhật Minh', 'Bảo Châu', 'Quang Huy'] : ['Phương Anh', 'Hải Đăng', 'Ngọc Mai', 'Tùng Lâm', 'Gia Hân', 'Bảo Nam', 'Diệp Chi', 'Anh Khoa'];
+  const now = Date.now(); d = { max_may: 2, lh: [{ id: 'LDEMO' + L, ten: LOPS[L].ten + ' · Thứ 7 sáng (ví dụ)', lich: 'Thứ 4 18:00 và Thứ 7 9:00', khai_giang: '', ghi_chu: '' }], kids: [], awards: [], orders: [], hs: [], bl: [], gc: [], tn: [], cfg: { ten_lop: LOPS[L].ten, khai_giang: ymd(new Date(now - 17 * 864e5)) }, seq: 1 };
   names.forEach((n, i) => { const ngay = Math.max(0, Math.round(5 + rnd() * 8 - (i === 2 ? 5 : 0))); const dsc = i === 2 ? 7 : Math.floor(rnd() * 4);
-    d.kids.push({ id: 'DM' + S.lop.toUpperCase() + (i + 1), lop: S.lop, ten: n + ' (ví dụ)', tao: now, web: Math.round(ngay * 14 + rnd() * 20), vi: 0, ngay, cuoi: ymd(new Date(now - dsc * 864e5)), luu: now, tt: '', lh: i < 5 ? 'LDEMO1' : '', pin: i < 7 ? String(1000 + Math.floor(rnd() * 8999)) : '', may: i < 7 ? [{ d: 'demo' + i, at: now - 3 * 864e5, ua: 'Android' }] : [], cho: i === 1 ? [{ d: 'demoX', at: now - 3600e3, ua: 'iPhone/iPad' }] : [] }); });
+    d.kids.push({ id: 'DM' + L.toUpperCase() + (i + 1), link: 'demo' + L + (i + 1) + 'xyz', lich_su: [], lop: L, ten: n + ' (ví dụ)', tao: now, web: Math.round(ngay * 14 + rnd() * 20), vi: 0, ngay, cuoi: ymd(new Date(now - dsc * 864e5)), luu: now, tt: '', lh: i < 5 ? 'LDEMO' + L : '', pin: i < 7 ? String(1000 + Math.floor(rnd() * 8999)) : '', may: i < 7 ? [{ d: 'demo' + i, at: now - 3 * 864e5, ua: 'Android' }] : [], cho: i === 1 ? [{ d: 'demoX', at: now - 3600e3, ua: 'iPhone/iPad' }] : [] }); });
   [0, 1, 2, 3, 4].forEach(b => { d.bl.push({ buoi: b, ngay: ymd(new Date(now - (17 - b * 3.5) * 864e5)), da_day: true, ghi_chu: b === 2 ? 'Chưa kịp trò Bingo' : '' });
     d.kids.forEach((k, i) => { const vang = (i === 2 && b >= 3) || (i === 5 && b === 1); const l = () => 1 + Math.floor(rnd() * 3);
       d.hs.push({ buoi: b, kid: k.id, cm: vang ? (i === 5 ? 'p' : 'v') : (rnd() < .1 ? 't' : 'c'), tg: vang ? '' : (i === 4 ? 1 : l()), en: vang ? '' : l(), zh: vang ? '' : l(), bt: vang ? '' : l(), note: '' }); }); });
@@ -536,22 +575,50 @@ function mockDb() {
 }
 function mock(q) {
   const d = mockDb(), save = () => { try { localStorage.setItem('qtl-demo-' + S.lop, JSON.stringify(d)); } catch (e) {} };
-  if (q.pin !== '2468') return { ok: false, err: 'Sai mã PIN' };
   const id = p => p + Math.random().toString(36).slice(2, 8).toUpperCase();
+  /* tài khoản xem thử: demo / 2468 (quản trị); tài khoản tạo thêm ở mục Nhân sự dùng mật khẩu đã đặt */
+  let T; try { T = JSON.parse(localStorage.getItem('qtl-demo-tk')); } catch (e) {}
+  if (!T) T = [{ id: 'UDEMO', ten_dn: 'demo', ho_ten: 'Quản trị CES (ví dụ)', vai: 'qt', lh: [], p: '2468', khoa: false, dn_cuoi: 0 }];
+  const saveT = () => { try { localStorage.setItem('qtl-demo-tk', JSON.stringify(T)); } catch (e) {} }, tkO = u => ({ id: u.id, ten_dn: u.ten_dn, ho_ten: u.ho_ten, vai: u.vai, lh: u.lh, khoa: !!u.khoa, dn_cuoi: u.dn_cuoi || 0 });
+  if (q.action === 'qt_dn') { const u = T.find(x => x.ten_dn === String(q.u || '').trim().toLowerCase() && !x.khoa); if (!u || u.p !== q.p) return { ok: false, err: 'Sai tên đăng nhập hoặc mật khẩu' }; u.dn_cuoi = Date.now(); saveT(); return { ok: true, tok: 'demo.' + u.id, toi: tkO(u) }; }
+  if (q.action === 'qt_tk_dau') return { ok: false, err: 'Bản xem thử đã có tài khoản: demo / 2468' };
+  const me = T.find(x => 'demo.' + x.id === q.tok && !x.khoa); if (!me) return { ok: false, het: true, err: 'Phiên đăng nhập đã hết. Đăng nhập lại nhé.' };
+  const ad = me.vai === 'qt', lhOk = lh => ad || me.lh.includes(lh), lhAll = () => ['ls', 'sd'].flatMap(L => mockDb(L).lh.map(l => ({ id: l.id, khoa: L, ten: l.ten })));
+  if (/^qt_tk_/.test(q.action) && !ad) return { ok: false, err: 'Tài khoản này không làm được việc này' };
+  if (!ad) { if (q.tu) q.tu = me.vai; if (q.ten != null || q.action === 'qt_td_them') q.ten = me.ho_ten; if (q.nguoi != null) q.nguoi = me.ho_ten; }
   switch (q.action) {
-    case 'qt_tai': return Object.assign({ ok: true, v: 9, td: [], hl: [], hl_max: 10 }, JSON.parse(JSON.stringify(d)));
+    case 'qt_tai': { if (!ad && !d.lh.some(l => lhOk(l.id))) return { ok: false, khong_lop: true, err: 'Tài khoản này chưa được giao lớp nào ở khoá này' };
+      const o = Object.assign({ ok: true, v: 10, td: [], hl: [], hl_max: 10, toi: tkO(me), lh_all: lhAll().filter(l => lhOk(l.id)) }, JSON.parse(JSON.stringify(d)));
+      if (!ad) { o.kids = o.kids.filter(k => lhOk(k.lh)); const ids = new Set(o.kids.map(k => k.id)); o.lh = o.lh.filter(l => lhOk(l.id)); ['hs', 'gc', 'awards', 'orders'].forEach(f => o[f] = (o[f] || []).filter(x => ids.has(x.kid))); o.td = o.td.filter(t => lhOk(t.lh)); o.hl = o.hl.filter(t => lhOk(t.lh)); }
+      return o; }
+    case 'qt_tk_ds': return { ok: true, tk: T.map(tkO), lh_all: lhAll() };
+    case 'qt_tk_luu': { const vai = ['qt', 'gv', 'ql'].includes(q.vai) ? q.vai : 'gv', lh = q.lh || [];
+      if (q.id) { const u = T.find(x => x.id === q.id); if (!u) return { ok: false, err: 'Không có tài khoản này' }; if (u.id === me.id && vai !== 'qt') return { ok: false, err: 'Không tự bỏ quyền quản trị của mình được' };
+        Object.assign(u, { ho_ten: q.ho_ten || u.ho_ten, vai, lh }); if (q.p) { if (q.p.length < 6) return { ok: false, err: 'Mật khẩu cần ít nhất 6 ký tự' }; u.p = q.p; } saveT(); return { ok: true }; }
+      const u = String(q.ten_dn || '').trim().toLowerCase(); if (!/^[a-z0-9._-]{3,30}$/.test(u)) return { ok: false, err: 'Tên đăng nhập 3–30 ký tự, chỉ chữ không dấu, số, dấu chấm, gạch' };
+      if (T.some(x => x.ten_dn === u)) return { ok: false, err: 'Tên đăng nhập này đã có người dùng' }; if (String(q.p || '').length < 6) return { ok: false, err: 'Mật khẩu cần ít nhất 6 ký tự' }; if (!String(q.ho_ten || '').trim()) return { ok: false, err: 'Nhập họ tên người dùng' };
+      const o = { id: id('U'), ten_dn: u, ho_ten: q.ho_ten.trim(), vai, lh, p: q.p, khoa: false }; T.push(o); saveT(); return { ok: true, id: o.id }; }
+    case 'qt_tk_khoa': { if (q.id === me.id) return { ok: false, err: 'Không tự khoá tài khoản của mình được' }; const u = T.find(x => x.id === q.id); if (u) u.khoa = !!+q.khoa; saveT(); return { ok: true }; }
+    case 'qt_mk': { if (q.cu !== me.p) return { ok: false, err: 'Mật khẩu cũ chưa đúng' }; if (String(q.moi || '').length < 6) return { ok: false, err: 'Mật khẩu mới cần ít nhất 6 ký tự' }; me.p = q.moi; saveT(); return { ok: true, tok: 'demo.' + me.id }; }
+    case 'qt_link': { const out = []; (q.ids || []).forEach(i => { const k = d.kids.find(x => x.id === i); if (k) { k.link = Math.random().toString(36).slice(2, 12); out.push({ id: i, link: k.link }); } }); save(); return { ok: true, kids: out }; }
     case 'qt_hl_them': { d.hl = d.hl || []; if (q.b64 && q.b64.length * 0.75 > 10 * 1048576) return { ok: false, err: 'File lớn', qua_lon: true };
-      const kid = (q.kid || []).filter(x => d.kids.some(k => k.id === x)), o = { id: id('H'), lh: q.lh || '', buoi: q.buoi === '' ? '' : +q.buoi, kid, ten: q.ten, file: q.file || '', mime: q.mime || '', co: q.b64 ? Math.round(q.b64.length * 0.75) : 0, url: q.url || '', co_file: !!q.b64, cach: q.cach, gc: q.ghi_chu || '', tu: q.tu, nguoi: q.nguoi || '', at: Date.now(), phat: 0, gui: 0 };
+      const kid = (q.kid || []).filter(x => d.kids.some(k => k.id === x)), o = { id: id('H'), lh: q.lh || '', buoi: q.buoi === '' ? '' : +q.buoi, kid, ten: q.ten, file: q.file || '', mime: q.mime || '', co: q.b64 ? Math.round(q.b64.length * 0.75) : 0, url: q.url || '', co_file: !!q.b64, web: !!+q.web, cach: q.cach, gc: q.ghi_chu || '', tu: q.tu, nguoi: q.nguoi || '', at: Date.now(), phat: 0, gui: 0 };
       if (q.b64) (window.__HLF = window.__HLF || {})[o.id] = { b64: q.b64, mime: q.mime, ten: (o.buoi !== '' ? 'Buổi ' + o.buoi + ' – ' : '') + q.file };
       d.hl.unshift(o); save(); return { ok: true, hl: o }; }
-    case 'qt_hl_sua': { const t = (d.hl || []).find(x => x.id === q.id); if (!t) return { ok: false, err: 'Không có học liệu này' }; if (q.phat != null) t.phat = +q.phat ? Date.now() : 0; if (q.gui != null) t.gui = +q.gui ? Date.now() : 0; if (+q.an) d.hl = d.hl.filter(x => x !== t); save(); return { ok: true }; }
+    case 'qt_hl_sua': { const t = (d.hl || []).find(x => x.id === q.id); if (!t) return { ok: false, err: 'Không có học liệu này' }; if (q.phat != null) t.phat = +q.phat ? Date.now() : 0; if (q.gui != null) t.gui = +q.gui ? Date.now() : 0; if (q.web != null) t.web = !!+q.web; if (+q.an) d.hl = d.hl.filter(x => x !== t); save(); return { ok: true }; }
     case 'qt_hl_lay': { const f = (window.__HLF || {})[q.id]; return f ? Object.assign({ ok: true }, f) : { ok: false, err: 'Bản xem thử không giữ file sau khi tải lại trang' }; }
     case 'qt_td_them': { d.td = d.td || []; const o = { id: id('T'), lh: q.lh || '', tu: q.tu, den: q.den, loai: q.loai, kid: q.kid || '', buoi: q.buoi, nd: q.noi_dung, han: q.han || '', tt: 'mo', tl: '', ten: q.ten || '', at: Date.now(), xong: 0 }; d.td.unshift(o); save(); return { ok: true, td: o }; }
     case 'qt_td_sua': { const t = (d.td || []).find(x => x.id === q.id); if (!t) return { ok: false, err: 'Không có mục này' }; if (q.tt) { t.tt = q.tt; t.xong = q.tt === 'xong' ? Date.now() : 0; } if (q.tra_loi != null) t.tl = q.tra_loi; d.td = d.td.filter(x => x.tt !== 'xoa'); save(); return { ok: true }; }
     case 'qt_lh_luu': { if (!String(q.ten || '').trim()) return { ok: false, err: 'Chưa có tên lớp' }; if (d.lh.some(x => x.id !== q.id && x.ten.toLowerCase() === String(q.ten).trim().toLowerCase())) return { ok: false, err: 'Khoá này đã có lớp tên như vậy' };
       const o = { id: q.id || id('L'), ten: String(q.ten).trim(), lich: q.lich || '', khai_giang: q.khai_giang || '', ghi_chu: q.ghi_chu || '' }, i = d.lh.findIndex(x => x.id === o.id); i < 0 ? d.lh.push(o) : d.lh[i] = o; save(); return { ok: true, id: o.id }; }
     case 'qt_lh_xoa': { const n = d.kids.filter(k => k.lh === q.id).length; if (n) return { ok: false, err: 'Lớp còn ' + n + ' bạn. Chuyển các bạn sang lớp khác trước khi xoá.' }; d.lh = d.lh.filter(x => x.id !== q.id); save(); return { ok: true }; }
-    case 'qt_chuyen': { let n = 0; (q.ids || []).forEach(i => { const k = d.kids.find(x => x.id === i); if (k) { k.lh = q.lh || ''; n++; } }); save(); return { ok: true, n }; }
+    case 'qt_chuyen': { if (!ad && me.vai === 'gv') return { ok: false, err: 'Tài khoản Giáo viên không làm được việc này' };
+      const kh = lhAll().find(l => l.id === q.lh && l.khoa !== S.lop); let n = 0;
+      (q.ids || []).forEach(i => { const k = d.kids.find(x => x.id === i); if (!k) return; n++;
+        if (kh) { const o = mockDb(kh.khoa); d.kids = d.kids.filter(x => x !== k); (k.lich_su = k.lich_su || []).push({ lop: S.lop, ngay: k.ngay, web: k.web, vi: k.vi, den: Date.now() });
+          Object.assign(k, { lop: kh.khoa, lh: kh.id, ngay: 0, web: 0, cuoi: '' }); o.kids.push(k); if (k.vi) o.awards.unshift({ id: id('A'), kid: k.id, n: k.vi, why: 'Sao mang sang từ ' + LOPS[S.lop].ten, at: Date.now(), huy: false });
+          try { localStorage.setItem('qtl-demo-' + kh.khoa, JSON.stringify(o)); } catch (e) {} }
+        else k.lh = q.lh || ''; }); save(); return { ok: true, n, khoa: kh ? n : 0 }; }
     case 'qt_buoi': { const i = d.bl.findIndex(x => x.buoi === +q.buoi && (x.lh || '') === (q.lh || '')), o = { buoi: +q.buoi, ngay: q.ngay, da_day: !!q.da_day, ghi_chu: q.ghi_chu || '', lh: q.lh || '' }; i < 0 ? d.bl.push(o) : d.bl[i] = o;
       (q.rows || []).forEach(r => { const j = d.hs.findIndex(x => x.buoi === +q.buoi && x.kid === r.kid), o2 = { buoi: +q.buoi, kid: r.kid, cm: r.cm || '', tg: r.tg, en: r.en, zh: r.zh, bt: r.bt, note: r.note || '' }; j < 0 ? d.hs.push(o2) : d.hs[j] = o2; }); save(); return { ok: true, n: (q.rows || []).length }; }
     case 'qt_gc_them': { const o = { id: id('N'), kid: q.kid, buoi: q.buoi === '' ? '' : +q.buoi, loai: q.loai, nd: q.noi_dung, at: Date.now(), cs: !!q.chia_se }; d.gc.unshift(o); save(); return { ok: true, note: o }; }
@@ -574,6 +641,4 @@ function mock(q) {
 }
 
 /* ---------- khởi động ---------- */
-S.pin = store.get('qtl-pin-' + S.lop);
-if (DEMO && !S.pin) { S.pin = '2468'; }
-S.pin ? enter() : login();
+S.tok ? enter() : login();
