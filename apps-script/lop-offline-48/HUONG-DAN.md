@@ -92,3 +92,11 @@ Mỗi con có **mã** (trong link `?con=MÃ`) và **PIN 4 số**. Mỗi con nh�
 - Ô **Lớp** trên đầu trang quản trị lọc mọi mục theo một lớp. Điểm danh, ngày dạy, ghi chú buổi và ngày khai giảng ghi riêng cho lớp đang chọn. Bảng của con hiện buổi học và khai giảng của đúng lớp con.
 - Chỉ xoá được lớp không còn bạn nào. Tạo tài khoản con khi đang chọn một lớp thì các bạn mới vào luôn lớp đó.
 - Cập nhật máy chủ lên bản 7: dán Code.gs mới → Lưu → chạy hàm **caiDat** (tạo tab LopHoc và các cột mới) → **Triển khai → Quản lý triển khai → ✏️ → Phiên bản: Phiên bản mới → Triển khai**. Mở link /exec?action=ping thấy `"v":7` là xong.
+
+## Trao đổi, nhờ việc giữa giáo viên và quản lý lớp (bản 8)
+
+- Máy chủ thêm tab **TraoDoi** (`id, lop, lh, tu, den, loai, kid, buoi, noi_dung, han, tt, tra_loi, ten, at, xong_at`); chạy `caiDat` một lần để tạo tab.
+- Lệnh mới: `qt_td_them` (gửi tin hoặc nhờ việc, cần PIN khoá), `qt_td_sua` (đánh dấu xong, mở lại, xoá, trả lời). `qt_tai` trả thêm `td`.
+- Trên trang quản trị, ở "Việc của tôi" của mỗi vai có thẻ **Trao đổi với giáo viên / quản lý lớp**: việc vai kia gửi mình (bấm "Đã làm xong", "Trả lời"), ô gửi tin hoặc nhờ việc (chọn con, buổi, hạn, có câu mẫu), danh sách mình đã gửi kèm trạng thái. Số việc đang chờ hiện trên tab "Việc của tôi".
+- Ở thẻ "Con cần hỗ trợ", các giải pháp thuộc vai kia có nút 📌 để nhờ thẳng.
+- Cập nhật: dán Code.gs mới → Lưu → chạy `caiDat` → Triển khai → Quản lý triển khai → ✏️ → Phiên bản mới → Triển khai. Mở `/exec?action=ping` thấy `"v":8` là xong.

@@ -55,7 +55,7 @@ async function load() {
     r = { ok: true, v: 3, cfg: {}, kids: c.kids, awards: c.awards, orders: c.orders, hs: [], bl: [], gc: [], tn: [] };
   }
   if (!r.ok) return r;
-  S.d = r; S.v3 = r.v < 4; S.v5 = r.v >= 5; S.v7 = r.v >= 7; r.lh = r.lh || [];
+  S.d = r; S.v3 = r.v < 4; S.v5 = r.v >= 5; S.v7 = r.v >= 7; S.v8 = r.v >= 8; r.lh = r.lh || []; r.td = r.td || [];
   S.lh = store.get('qtl-lh-' + S.lop); if (S.lh && S.lh !== '_none' && !lhOf(S.lh)) S.lh = ''; return r;
 }
 async function refresh(keepScroll) { const y = scrollY; const r = await load(); if (!r.ok) { toast(r.err || 'Chưa tải được'); return; } draw(); if (keepScroll) scrollTo(0, y); }
@@ -539,7 +539,9 @@ function mock(q) {
   if (q.pin !== '2468') return { ok: false, err: 'Sai mã PIN' };
   const id = p => p + Math.random().toString(36).slice(2, 8).toUpperCase();
   switch (q.action) {
-    case 'qt_tai': return Object.assign({ ok: true, v: 7 }, JSON.parse(JSON.stringify(d)));
+    case 'qt_tai': return Object.assign({ ok: true, v: 8, td: [] }, JSON.parse(JSON.stringify(d)));
+    case 'qt_td_them': { d.td = d.td || []; const o = { id: id('T'), lh: q.lh || '', tu: q.tu, den: q.den, loai: q.loai, kid: q.kid || '', buoi: q.buoi, nd: q.noi_dung, han: q.han || '', tt: 'mo', tl: '', ten: q.ten || '', at: Date.now(), xong: 0 }; d.td.unshift(o); save(); return { ok: true, td: o }; }
+    case 'qt_td_sua': { const t = (d.td || []).find(x => x.id === q.id); if (!t) return { ok: false, err: 'Không có mục này' }; if (q.tt) { t.tt = q.tt; t.xong = q.tt === 'xong' ? Date.now() : 0; } if (q.tra_loi != null) t.tl = q.tra_loi; d.td = d.td.filter(x => x.tt !== 'xoa'); save(); return { ok: true }; }
     case 'qt_lh_luu': { if (!String(q.ten || '').trim()) return { ok: false, err: 'Chưa có tên lớp' }; if (d.lh.some(x => x.id !== q.id && x.ten.toLowerCase() === String(q.ten).trim().toLowerCase())) return { ok: false, err: 'Khoá này đã có lớp tên như vậy' };
       const o = { id: q.id || id('L'), ten: String(q.ten).trim(), lich: q.lich || '', khai_giang: q.khai_giang || '', ghi_chu: q.ghi_chu || '' }, i = d.lh.findIndex(x => x.id === o.id); i < 0 ? d.lh.push(o) : d.lh[i] = o; save(); return { ok: true, id: o.id }; }
     case 'qt_lh_xoa': { const n = d.kids.filter(k => k.lh === q.id).length; if (n) return { ok: false, err: 'Lớp còn ' + n + ' bạn. Chuyển các bạn sang lớp khác trước khi xoá.' }; d.lh = d.lh.filter(x => x.id !== q.id); save(); return { ok: true }; }

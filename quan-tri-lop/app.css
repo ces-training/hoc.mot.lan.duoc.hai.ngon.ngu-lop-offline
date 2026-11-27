@@ -232,3 +232,12 @@ a.btnlink{text-decoration:none;display:inline-flex;align-items:center}
 /* thanh mục xuống hàng riêng để không chen với nút vai, khoá, lớp */
 .top .nav{order:9;flex-basis:100%;display:flex;flex-wrap:wrap;gap:4px}
 .top #logout{margin-left:auto}
+/* trao đổi, nhờ việc giữa giáo viên và quản lý lớp */
+.tdcard h3.pha{font-size:.9rem;margin:6px 0}
+.tds{list-style:none;margin:6px 0;padding:0;display:grid;gap:8px}
+.td{border:1px solid var(--line,#e3e3e3);border-left:4px solid var(--blue,#2b6cb0);border-radius:10px;padding:8px 10px;background:#fff}
+.td.viec{border-left-color:var(--amber,#b7791f)}.td.xong{opacity:.7;border-left-color:var(--brand,#2f855a)}.td.qh{border-left-color:var(--red,#c53030)}
+.td-h{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.td-nd{margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.td-tl{background:var(--blue-soft,#ebf4ff);border-radius:8px;padding:4px 8px;margin-bottom:6px;white-space:pre-wrap}
+.td-b{gap:6px}.tdgui{margin:10px 0}.tdgui textarea{width:100%;box-sizing:border-box;margin:6px 0}
+.tdmau{margin-top:6px}.tdmau button{font-size:.8rem}.ht-nho{gap:4px;align-items:center;margin-top:4px}

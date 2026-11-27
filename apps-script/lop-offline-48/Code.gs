@@ -30,6 +30,9 @@
  *   Tab LopHoc (id, khoa, ten, lich, khai_giang, ghi_chu, tao, an); HocSinh thêm cột lop_hoc (mã lớp học của con);
  *   BuoiLop thêm cột lh (mỗi lớp học ghi ngày dạy, ghi chú buổi riêng). Lệnh: qt_lh_luu, qt_lh_xoa, qt_chuyen.
  *   Không có lớp học nào thì mọi thứ chạy như bản 6.
+ * Bản 8 (27/11/2026): TRAO ĐỔI giữa Giáo viên và Quản lý lớp. Tab TraoDoi: tin nhắn hoặc việc nhờ
+ *   (tu/den = gv | ql), gắn được với một con, một buổi, hạn; trạng thái mo / xong / xoa, kèm trả lời.
+ *   Lệnh: qt_td_them, qt_td_sua. qt_tai trả thêm td.
  */
 
 const TAB = {
@@ -44,14 +47,16 @@ const TAB = {
   GhiChu:  ['id', 'lop', 'kid', 'buoi', 'loai', 'noi_dung', 'at', 'xoa', 'chia_se'],  // nhật ký từng con; chia_se = x thì con và ba mẹ thấy trong Bảng của con
   TaiNguyen: ['id', 'lop', 'nhom', 'ten', 'url', 'ghi_chu', 'thu_tu'],                // link tài liệu của lớp (chỉ hiện sau khi nhập PIN)
   /* ---- bản 7: lớp học trong mỗi khoá ---- */
-  LopHoc:  ['id', 'khoa', 'ten', 'lich', 'khai_giang', 'ghi_chu', 'tao', 'an']        // khoa = ls / sd; an = x là đã xoá
+  LopHoc:  ['id', 'khoa', 'ten', 'lich', 'khai_giang', 'ghi_chu', 'tao', 'an'],       // khoa = ls / sd; an = x là đã xoá
+  /* ---- bản 8: trao đổi, nhờ việc giữa GV và quản lý lớp ---- */
+  TraoDoi: ['id', 'lop', 'lh', 'tu', 'den', 'loai', 'kid', 'buoi', 'noi_dung', 'han', 'tt', 'tra_loi', 'ten', 'at', 'xong_at']
 };
 const LOAI_GHI = ['tien_bo', 'ho_tro', 'phu_huynh', 'hanh_vi', 'khac'];
 const LOP_MAC_DINH = [['ls', 'Little Seed offline 48 buổi'], ['sd', 'Seedling offline 48 buổi']];
 const TEXT_COLS = { HocSinh: ['lop', 'id', 'ten', 'cuoi', 'pin_con', 'may', 'cho_may', 'nguon', 'lop_hoc'], TienDo: ['lop', 'id', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6'], Thuong: ['id', 'lop', 'kid'],
   DoiQua: ['code', 'lop', 'kid'], CaiDat: ['lop', 'pin', 'video_folder', 'khai_giang'],
   BuoiHS: ['k', 'lop', 'kid'], BuoiLop: ['k', 'lop', 'ngay', 'lh'], GhiChu: ['id', 'lop', 'kid'], TaiNguyen: ['id', 'lop'],
-  LopHoc: ['id', 'khoa', 'khai_giang'] };
+  LopHoc: ['id', 'khoa', 'khai_giang'], TraoDoi: ['id', 'lop', 'lh', 'kid', 'han', 'ten'] };
 const VIDEO_CACHE_GIAY = 300;   // danh sách video nhớ 5 phút: video mới thả vào Drive hiện trên web chậm nhất ~5 phút
 const CHUNK = 45000;           // một ô Google Sheet chứa tối đa 50.000 ký tự
 const MAX_DATA = CHUNK * 6;    // ~270.000 ký tự tiến độ mỗi con
@@ -79,7 +84,7 @@ function handle_(q) {
   const needPin = () => (pinOk() ? null : { ok: false, err: lop ? 'Sai mã PIN' : 'Thiếu mã lớp' });
 
   switch (q.action) {
-    case 'ping': return { ok: true, v: 7 };
+    case 'ping': return { ok: true, v: 8 };
 
     /* ---------- Góc vinh danh (công khai) ---------- */
     case 'video': {
@@ -212,7 +217,7 @@ function handle_(q) {
       const bad = needPin(); if (bad) return bad;
       const cfg = rows_('CaiDat').find(x => x.lop === lop) || {};
       const kids = rows_('HocSinh').filter(k => k.lop === lop), ids = new Set(kids.map(k => k.id));
-      return { ok: true, v: 7, cfg: { ten_lop: cfg.ten_lop || '', khai_giang: ngay_(cfg.khai_giang) }, lh: lopHoc_(lop).map(lhOut_),
+      return { ok: true, v: 8, td: rows_('TraoDoi').filter(r => r.lop === lop && r.tt !== 'xoa').reverse().slice(0, 400).map(tdOut_), cfg: { ten_lop: cfg.ten_lop || '', khai_giang: ngay_(cfg.khai_giang) }, lh: lopHoc_(lop).map(lhOut_),
         kids: kids.map(k => Object.assign(kidOut_(k), { pin: String(k.pin_con || ''), may: parseJ_(k.may), cho: parseJ_(k.cho_may), lh: String(k.lop_hoc || '') })), max_may: maxMay_(lop),
         awards: rows_('Thuong').filter(a => ids.has(a.kid)).reverse().slice(0, 400).map(awardOut_),
         orders: rows_('DoiQua').filter(o => ids.has(o.kid)).reverse().map(orderOut_),
@@ -325,6 +330,22 @@ function handle_(q) {
       if (n) return { ok: false, err: 'Lớp còn ' + n + ' bạn. Chuyển các bạn sang lớp khác trước khi xoá.' };
       set_('LopHoc', c.row, { an: 'x' }); return { ok: true };
     }
+    case 'qt_td_them': {   // bản 8: gửi tin hoặc nhờ việc cho vai kia
+      const bad = needPin(); if (bad) return bad;
+      const nd = String(q.noi_dung || '').trim().slice(0, 1000); if (!nd) return { ok: false, err: 'Chưa có nội dung' };
+      const vai = ['gv', 'ql'], tu = vai.includes(q.tu) ? q.tu : 'ql', den = vai.includes(q.den) ? q.den : (tu === 'gv' ? 'ql' : 'gv');
+      if (q.kid) { const k = find_('HocSinh', 'id', q.kid); if (!k || k.obj.lop !== lop) return { ok: false, err: 'Không có con này trong lớp' }; }
+      const o = { id: newId_('T'), lop, lh: String(q.lh || ''), tu, den, loai: q.loai === 'viec' ? 'viec' : 'tin', kid: String(q.kid || ''), buoi: q.buoi === '' || q.buoi == null ? '' : Math.round(+q.buoi),
+        noi_dung: nd, han: ngay_(q.han), tt: 'mo', tra_loi: '', ten: String(q.ten || '').trim().slice(0, 40), at: new Date(), xong_at: '' };
+      add_('TraoDoi', o); return { ok: true, td: tdOut_(o) };
+    }
+    case 'qt_td_sua': {   // đánh dấu xong / mở lại / xoá, hoặc trả lời
+      const bad = needPin(); if (bad) return bad;
+      const t = find_('TraoDoi', 'id', q.id); if (!t || t.obj.lop !== lop) return { ok: false, err: 'Không có mục này' };
+      const o = {}; if (['mo', 'xong', 'xoa'].includes(q.tt)) { o.tt = q.tt; o.xong_at = q.tt === 'xong' ? new Date() : ''; }
+      if (q.tra_loi != null) o.tra_loi = String(q.tra_loi).trim().slice(0, 600);
+      set_('TraoDoi', t.row, o); return { ok: true };
+    }
     case 'qt_chuyen': {   // xếp / chuyển lớp: ids = danh sách mã con, lh = mã lớp đích ('' = chưa xếp lớp)
       const bad = needPin(); if (bad) return bad;
       const lh = String(q.lh || ''); if (lh && !lopHoc_(lop).some(x => x.id === lh)) return { ok: false, err: 'Không có lớp học này' };
@@ -402,6 +423,7 @@ function upsertMany_(name, list) {
 function hsOut_(r) { return { buoi: +r.buoi, kid: r.kid, cm: r.cm || '', tg: r.tg === '' ? '' : +r.tg, en: r.en === '' ? '' : +r.en, zh: r.zh === '' ? '' : +r.zh, bt: r.bt === '' ? '' : +r.bt, note: r.note || '' }; }
 function blOut_(r) { return { buoi: +r.buoi, ngay: ngay_(r.ngay), da_day: truthy_(r.da_day), ghi_chu: r.ghi_chu || '', lh: String(r.lh || '') }; }
 function gcOut_(r) { return { id: String(r.id), kid: r.kid, buoi: r.buoi === '' ? '' : +r.buoi, loai: r.loai || 'khac', nd: r.noi_dung || '', at: +r.at || 0, cs: truthy_(r.chia_se) }; }
+function tdOut_(r) { return { id: String(r.id), lh: String(r.lh || ''), tu: r.tu, den: r.den, loai: r.loai || 'tin', kid: String(r.kid || ''), buoi: r.buoi === '' ? '' : +r.buoi, nd: r.noi_dung || '', han: ngay_(r.han), tt: r.tt || 'mo', tl: r.tra_loi || '', ten: r.ten || '', at: +r.at || +new Date(r.at) || 0, xong: +r.xong_at || 0 }; }
 function lopHoc_(khoa) { return rows_('LopHoc').filter(x => x.khoa === khoa && !truthy_(x.an)).sort((a, b) => String(a.ten).localeCompare(String(b.ten), 'vi')); }
 function lhOut_(r) { return { id: String(r.id), ten: r.ten || '', lich: r.lich || '', khai_giang: ngay_(r.khai_giang), ghi_chu: r.ghi_chu || '' }; }
 function tnOut_(r) { return { id: String(r.id), nhom: r.nhom || 'Khác', ten: r.ten || '', url: r.url || '', ghi_chu: r.ghi_chu || '', thu_tu: +r.thu_tu || 0 }; }

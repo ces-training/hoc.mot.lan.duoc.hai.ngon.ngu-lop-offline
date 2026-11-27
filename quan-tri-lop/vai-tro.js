@@ -29,6 +29,7 @@
     let el = $('#vaisw'); if (!el) { el = document.createElement('div'); el.id = 'vaisw'; el.className = 'vaisw'; el.setAttribute('role', 'tablist'); el.setAttribute('aria-label', 'Vai trò'); $('#top .brand').after(el); }
     el.innerHTML = Object.keys(VAI).map(v => `<button class="pill vai ${v}" role="tab" type="button" aria-selected="${S.vai === v}" data-vai="${v}">${vaiTen(v)}</button>`).join('');
     $$('[data-vai]', el).forEach(b => b.onclick = () => chonVai(b.dataset.vai));
+    const n = tdCuaToi().filter(t => t.tt === 'mo').length, tq = $('#nav [data-tab=tq]'); if (n && tq) tq.insertAdjacentHTML('beforeend', `<span class="dot">${n}</span>`);
   };
   function chonVai(v) { S.vai = v; store.set('qtl-vai', v); S.tab = 'tq'; draw(); scrollTo(0, 0); }
 
@@ -152,13 +153,51 @@
       ${kt ? `<h3 class="pha">Kiểm tra định kỳ</h3>${viec([{ t: `Buổi ${kt.n} sắp tới là buổi ôn / kiểm tra`, gap: true, s: 'Chuẩn bị bài test, lập lịch kiểm tra từng con với GV và gửi phụ huynh; sau đó tổng hợp báo cáo và bảng vinh danh.' }])}` : ''}
     </div>`;
   }
+  /* ---------- trao đổi, nhờ việc giữa hai vai (máy chủ bản 8) ---------- */
+  const vaiKia = v => v === 'gv' ? 'ql' : 'gv';
+  const tdLop = () => ((S.d && S.d.td) || []).filter(t => !S.lh || S.lh === '_none' || !t.lh || t.lh === S.lh);
+  const tdCuaToi = () => S.vai ? tdLop().filter(t => t.den === S.vai) : [];
+  const MAU = {
+    gv: ['Nhờ nhắn ba mẹ bạn {con} về việc: ', 'Nhờ in và chuẩn bị học liệu buổi {buoi}', 'Nhờ báo phụ huynh lớp: ', 'Nhờ xếp học bù cho bạn {con}', 'Nhận xét buổi {buoi} của các con đã ghi xong, nhờ chị biên tập và gửi ba mẹ'],
+    ql: ['Nhờ cô gửi nhận xét buổi {buoi} của bạn {con}', 'Nhờ cô chấm bảng buổi {buoi}', 'Nhờ cô kèm thêm 5 phút cho bạn {con} ở buổi tới', 'Nhờ cô gửi nội dung buổi {buoi}', 'Phụ huynh bạn {con} nhắn cô: ']
+  };
+  function theTraoDoi(D, M) {
+    if (!S.v8) return `<div class="card"><h2>Trao đổi với ${VAI[vaiKia(S.vai)].ten.toLowerCase()}</h2><p class="sm muted">Cần cập nhật máy chủ lên bản 8 để giáo viên và quản lý lớp nhắn tin, nhờ việc cho nhau (dán Code.gs mới → Triển khai → Quản lý triển khai → ✏️ → Phiên bản mới).</p></div>`;
+    const v = S.vai, k2 = vaiKia(v), all = tdLop(), den = all.filter(t => t.den === v && t.tt === 'mo'), gui = all.filter(t => t.tu === v).slice(0, 8), xong = all.filter(t => t.den === v && t.tt === 'xong').slice(0, 6);
+    const kName = id => { const k = S.d.kids.find(x => x.id === id); return k ? k.ten : ''; };
+    const quaHan = t => t.han && t.tt === 'mo' && t.han < new Date(Date.now() + 7 * 36e5).toISOString().slice(0, 10);
+    const one = (t, mine) => `<li class="td ${t.loai} ${t.tt} ${quaHan(t) ? 'qh' : ''}"><div class="td-h"><span class="chip ${t.loai === 'viec' ? 'a' : 'b'}">${t.loai === 'viec' ? '📌 Nhờ việc' : '💬 Tin'}</span>
+      <span class="sm muted">${mine ? 'gửi ' + VAI[t.den].ten : 'từ ' + VAI[t.tu].ten}${t.ten ? ' (' + esc(t.ten) + ')' : ''} · ${dmt(t.at)}${t.kid ? ' · bạn <b class="lk" data-kid="' + esc(t.kid) + '" role="button" tabindex="0">' + esc(kName(t.kid)) + '</b>' : ''}${t.buoi !== '' && t.buoi != null ? ' · buổi ' + t.buoi : ''}${t.han ? ' · hạn ' + dm(t.han) : ''}</span>${t.tt === 'xong' ? ' <span class="chip g">✓ xong ' + dmt(t.xong) + '</span>' : quaHan(t) ? ' <span class="chip r">sắp hết hạn</span>' : ''}</div>
+      <div class="td-nd">${esc(t.nd)}</div>${t.tl ? `<div class="td-tl sm">↪ ${esc(t.tl)}</div>` : ''}
+      <div class="row td-b">${!mine && t.tt === 'mo' ? `<button class="btn sm" type="button" data-tdx="${esc(t.id)}">✓ ${t.loai === 'viec' ? 'Đã làm xong' : 'Đã đọc'}</button>` : ''}${!mine ? `<button class="ghost sm" type="button" data-tdtl="${esc(t.id)}">Trả lời</button>` : ''}${mine ? `<button class="ghost sm" type="button" data-tdxoa="${esc(t.id)}">Xoá</button>` : ''}${!mine && t.tt === 'xong' ? `<button class="ghost sm" type="button" data-tdmo="${esc(t.id)}">Mở lại</button>` : ''}</div></li>`;
+    const kids = D.active.slice().sort((a, b) => String(a.ten).localeCompare(String(b.ten), 'vi'));
+    const L = M.L != null ? M.L : '', N = M.N != null ? M.N : '';
+    return `<div class="card tdcard"><h2>Trao đổi với ${VAI[k2].ten.toLowerCase()} ${den.length ? `<span class="chip r">${den.length} mới</span>` : ''}</h2>
+      <h3 class="pha">${VAI[k2].ic} ${VAI[k2].ten} gửi tôi</h3>${den.length ? `<ul class="tds">${den.map(t => one(t, false)).join('')}</ul>` : '<p class="sm muted">Không có việc nào đang chờ.</p>'}
+      <details class="tdgui" ${den.length ? '' : 'open'}><summary><b>✉️ Gửi tin / nhờ ${VAI[k2].ten.toLowerCase()}</b></summary>
+        <div class="row" style="margin:8px 0"><div class="chips"><button type="button" data-tdloai="viec" aria-pressed="${S.tdLoai !== 'tin'}">📌 Nhờ việc</button><button type="button" data-tdloai="tin" aria-pressed="${S.tdLoai === 'tin'}">💬 Tin nhắn</button></div></div>
+        <div class="row"><select id="tdk" aria-label="Về bạn nào" style="width:auto"><option value="">Cả lớp / không về bạn nào</option>${kids.map(k => `<option value="${esc(k.id)}">${esc(k.ten)}</option>`).join('')}</select>
+          <label class="sm">Buổi <input type="number" id="tdb" min="0" max="48" value="${N !== '' ? N : L}" style="width:70px"></label>
+          ${S.tdLoai !== 'tin' ? `<label class="sm">Hạn <input type="date" id="tdh"></label>` : ''}</div>
+        <div class="chips tdmau">${MAU[v].map((m, i) => `<button type="button" data-tdmau="${i}">${esc(m.replace(/\{con\}/g, '…').replace(/\{buoi\}/g, N !== '' ? N : '…'))}</button>`).join('')}</div>
+        <textarea id="tdn" rows="3" maxlength="1000" placeholder="Nội dung…"></textarea>
+        <div class="row"><input type="text" id="tdten" maxlength="40" placeholder="Tên người gửi (tuỳ chọn)" value="${esc(store.get('qtl-ten') || '')}" style="max-width:220px"><button class="btn" type="button" id="tdsend">Gửi ${VAI[k2].ten}</button></div>
+      </details>
+      ${gui.length ? `<details><summary class="sm"><b>Tôi đã gửi (${gui.length})</b> · ${gui.filter(t => t.tt === 'xong').length} đã xong</summary><ul class="tds">${gui.map(t => one(t, true)).join('')}</ul></details>` : ''}
+      ${xong.length ? `<details><summary class="sm"><b>Đã xong gần đây (${xong.length})</b></summary><ul class="tds">${xong.map(t => one(t, false)).join('')}</ul></details>` : ''}</div>`;
+  }
+  async function guiTd(o) {
+    const r = await call('qt_td_them', Object.assign({ lh: (lhCur() || {}).id || '', tu: S.vai, den: vaiKia(S.vai), ten: store.get('qtl-ten') || '' }, o));
+    if (!r.ok) { toast(r.err || 'Chưa gửi được'); return false; } toast('Đã gửi ' + VAI[vaiKia(S.vai)].ten); refresh(true); return true;
+  }
+
   function theHoTro(D, vai) {
     const ds = vanDe(D); if (!ds.length) return `<div class="card"><h2>Con cần hỗ trợ</h2><p class="ok">✓ Chưa thấy bạn nào có dấu hiệu cần hỗ trợ.</p></div>`;
     const li = ds.slice(0, 20).map(x => { const gp = x.v.gp.map((g, i) => [g, i]).filter(([g]) => g[0] === vai), khac = x.v.gp.filter(g => g[0] !== vai);
       return `<li class="ht ${x.dang.length ? 'dang' : ''}"><div class="ht-h"><span class="chip ${x.v.c}">${x.v.c === 'r' ? 'Cần xử lý' : 'Theo dõi'}</span> <b data-kid="${esc(x.k.id)}" role="button" tabindex="0" class="lk">${esc(x.k.ten)}</b> · ${esc(x.v.t)} <span class="muted sm">(${esc(x.chi)})</span></div>
         ${x.dang.length ? `<div class="sm dang-t">🤝 Đang hỗ trợ: ${x.dang.slice(0, 2).map(g => esc(String(g.nd).replace('Hỗ trợ · ' + x.v.t + ': ', '')) + ' · ' + dmt(g.at)).join('; ')}</div>` : ''}
         <div class="row ht-gp">${gp.map(([g, i]) => `<button class="ghost sm" type="button" data-gp="${esc(x.k.id)}|${x.key}|${i}">${esc(g[1])}</button>`).join('')}</div>
-        ${khac.length ? `<div class="sm muted">Việc của ${VAI[vai === 'gv' ? 'ql' : 'gv'].ten.toLowerCase()}: ${khac.map(g => esc(g[1])).join(' · ')}</div>` : ''}</li>`; }).join('');
+        ${khac.length ? (S.v8 ? `<div class="row ht-nho"><span class="sm muted">Nhờ ${VAI[vaiKia(vai)].ten.toLowerCase()}:</span>${x.v.gp.map((g, i) => [g, i]).filter(([g]) => g[0] !== vai).map(([g, i]) => `<button class="ghost xs" type="button" data-nho="${esc(x.k.id)}|${x.key}|${i}">📌 ${esc(g[1])}</button>`).join('')}</div>` : `<div class="sm muted">Việc của ${VAI[vaiKia(vai)].ten.toLowerCase()}: ${khac.map(g => esc(g[1])).join(' · ')}</div>`) : ''}</li>`; }).join('');
     return `<div class="card"><h2>Con cần hỗ trợ <span class="chip">${ds.length}</span></h2><p class="sm muted">Bấm một giải pháp để ghi vào hồ sơ con (ghi chú "Cần hỗ trợ"); bạn đã có giải pháp trong 14 ngày được xếp xuống dưới.</p><ul class="hts">${li}</ul>${ds.length > 20 ? `<p class="muted sm">… và ${ds.length - 20} việc nữa.</p>` : ''}</div>`;
   }
   function chonVaiView() {
@@ -173,7 +212,7 @@
     const bars = D.active.length ? `<div class="bars">${D.active.map(k => { const i = D.info[k.id], pct = Math.min(100, Math.round(100 * (k.ngay || 0) / tong)), cls = i.dsc == null || i.dsc >= 6 ? 'r' : i.dsc >= 4 ? 'a' : '';
       return `<div class="bar-row" data-kid="${esc(k.id)}" tabindex="0" role="button"><span class="nm">${esc(k.ten)}</span><div class="bar"><span class="fill ${cls}" style="width:${pct}%"></span>${exp != null ? `<i class="mark" style="left:${Math.min(100, Math.round(100 * exp / tong))}%"></i>` : ''}${M.need ? `<i class="mark need" style="left:${Math.min(100, Math.round(100 * M.need / tong))}%" title="cần xong trước buổi tới"></i>` : ''}</div><span class="vl">${k.ngay || 0}/${tong} ngày · ${i.dsc == null ? 'chưa học' : i.dsc === 0 ? 'hôm nay' : i.dsc + ' ngày trước'}</span></div>`; }).join('')}</div>` : '<div class="empty">Chưa có bạn nào.</div>';
     return `<div class="vaihead ${S.vai}"><b>${vaiTen(S.vai)}</b> · khu vực làm việc của ${S.vai === 'gv' ? 'giáo viên' : 'quản lý lớp'} · ${esc(lopTen())}</div>` +
-      theBuoi(M, S.vai) + `<div class="grid g2"><div>${S.vai === 'gv' ? viecGv(D, M) : viecQl(D, M)}</div><div>${theHoTro(D, S.vai)}<div class="card"><h2>Học web của từng bạn</h2>${bars}<div class="legend">Vạch xanh dương: web cần xong trước buổi tới${exp != null ? ' · vạch đen: tiến độ theo lịch' : ''}.</div></div></div></div>` + heat(D);
+      theBuoi(M, S.vai) + `<div class="grid g2"><div>${theTraoDoi(D, M)}${S.vai === 'gv' ? viecGv(D, M) : viecQl(D, M)}</div><div>${theHoTro(D, S.vai)}<div class="card"><h2>Học web của từng bạn</h2>${bars}<div class="legend">Vạch xanh dương: web cần xong trước buổi tới${exp != null ? ' · vạch đen: tiến độ theo lịch' : ''}.</div></div></div></div>` + heat(D);
   };
 
   /* ---------- Giáo án 48 buổi ---------- */
@@ -194,6 +233,19 @@
     $$('[data-vai]', root).forEach(b => b.onclick = () => chonVai(b.dataset.vai));
     $$('[data-cp]', root).forEach(b => b.onclick = async () => { const t = b.dataset.cp; try { await navigator.clipboard.writeText(t); toast('Đã chép. Dán vào Zalo nhé.'); } catch (e) { prompt('Chép nội dung này:', t); } });
     $$('[data-gotab]', root).forEach(b => b.onclick = () => { S.tab = b.dataset.gotab; draw(); scrollTo(0, 0); });
+    $$('[data-tdloai]', root).forEach(b => b.onclick = () => { S.tdLoai = b.dataset.tdloai; const n = $('#tdn').value; keepDraw(); $('.tdgui').open = true; $('#tdn').value = n; });
+    $$('[data-tdmau]', root).forEach(b => b.onclick = () => { const M = moc(derive()), k = S.d.kids.find(x => x.id === $('#tdk').value);
+      $('#tdn').value = MAU[S.vai][+b.dataset.tdmau].replace(/\{con\}/g, k ? k.ten : '…').replace(/\{buoi\}/g, $('#tdb').value || (M.N != null ? M.N : '')); $('#tdn').focus(); });
+    const send = $('#tdsend', root); if (send) send.onclick = async () => { const nd = $('#tdn').value.trim(); if (!nd) return toast('Nhập nội dung');
+      store.set('qtl-ten', $('#tdten').value.trim()); send.disabled = true;
+      const ok = await guiTd({ loai: S.tdLoai === 'tin' ? 'tin' : 'viec', kid: $('#tdk').value, buoi: $('#tdb').value, han: $('#tdh') ? $('#tdh').value : '', noi_dung: nd }); if (!ok) send.disabled = false; };
+    const sua = async (id, o, msg) => { const r = await call('qt_td_sua', Object.assign({ id }, o)); if (!r.ok) return toast(r.err || 'Chưa lưu được'); toast(msg); refresh(true); };
+    $$('[data-tdx]', root).forEach(b => b.onclick = () => sua(b.dataset.tdx, { tt: 'xong' }, 'Đã đánh dấu xong'));
+    $$('[data-tdmo]', root).forEach(b => b.onclick = () => sua(b.dataset.tdmo, { tt: 'mo' }, 'Đã mở lại'));
+    $$('[data-tdxoa]', root).forEach(b => b.onclick = () => { if (confirm('Xoá mục này?')) sua(b.dataset.tdxoa, { tt: 'xoa' }, 'Đã xoá'); });
+    $$('[data-tdtl]', root).forEach(b => b.onclick = () => { const t = S.d.td.find(x => x.id === b.dataset.tdtl), a = prompt('Trả lời:', t.tl || ''); if (a == null) return; sua(t.id, { tra_loi: a }, 'Đã gửi trả lời'); });
+    $$('[data-nho]', root).forEach(b => b.onclick = async () => { const [kid, key, i] = b.dataset.nho.split('|'), v = GIAI_PHAP[key], g = v.gp[+i], M = moc(derive());
+      b.disabled = true; const ok = await guiTd({ loai: 'viec', kid, buoi: M.L == null ? '' : M.L, noi_dung: `${v.t}: ${g[1]}` }); if (!ok) b.disabled = false; });
     $$('[data-gp]', root).forEach(b => b.onclick = async () => {
       const [kid, key, i] = b.dataset.gp.split('|'), v = GIAI_PHAP[key], g = v.gp[+i], M = moc(derive());
       b.disabled = true; const r = await call('qt_gc_them', { kid, loai: 'ho_tro', buoi: M.L == null ? '' : M.L, noi_dung: `Hỗ trợ · ${v.t}: ${g[1]} (${VAI[g[0]].ten})`, chia_se: '' });
