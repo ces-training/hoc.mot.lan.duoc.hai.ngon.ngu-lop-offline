@@ -32,7 +32,7 @@ def card_img(im, size):
     c = Image.new('RGBA', (size + 2 * pad, size + 2 * pad), (0, 0, 0, 0))
     ImageDraw.Draw(c).rounded_rectangle([0, 0, size + 2 * pad - 1, size + 2 * pad - 1], 26, fill=(255, 255, 255, 255), outline=(240, 200, 80, 255), width=6)
     mk = Image.new('L', (size, size), 0); ImageDraw.Draw(mk).rounded_rectangle([0, 0, size - 1, size - 1], 20, fill=255)
-    c.paste(im, (pad, pad), mk); return c
+    wb = Image.new('RGBA', im.size, (255, 255, 255, 255)); wb.alpha_composite(im.convert('RGBA')); c.paste(wb, (pad, pad), mk); return c
 
 def tint(im, mul):
     a = np.array(im.convert('RGBA')).astype(float)
@@ -59,9 +59,23 @@ def recolor(im, kind):
         v = np.clip(mx * 0.25 + 0.80, 0, 1); out[:, :, 0] = np.where(warm, v, r); out[:, :, 1] = np.where(warm, v * 0.78, g); out[:, :, 2] = np.where(warm, v * 0.18, b)
     return Image.fromarray((np.clip(out, 0, 1) * 255).astype('uint8'), 'RGBA')
 
+def ten_sheet():
+    """Ảnh gia đình Leo đúng 10 người, ghép bằng chương trình (ông, bà, chú, cô, bố, mẹ, anh, Leo, chị, em họ)."""
+    spec = [(NV + 'fam_bong_ong_a.webp', 560), (NV + 'fam_bong_ba_a.webp', 540), (NEW + 'uncle.webp', 570), (NEW + 'aunt.webp', 540),
+            (NV + 'fam_leo_bo_a.webp', 580), (NV + 'fam_leo_me_a.webp', 560), (NV + 'fam_leo_anh_trai_a.webp', 500), (NV + 'kids_leo_a.webp', 440),
+            (NV + 'fam_leo_chi_gai_a.webp', 420), (NEW + 'boy3.webp', 330)]
+    ims = []
+    for f, h in spec:
+        im = Image.open(f).convert('RGBA'); im = im.crop(im.getbbox()); ims.append(im.resize((max(1, int(im.width * h / im.height)), h), Image.LANCZOS))
+    gap = 10; tot = sum(i.width for i in ims) + gap * 9; k = min(1.0, 1300 / tot)
+    sh = Image.new('RGBA', (1376, 768), (255, 255, 255, 0)); x = int((1376 - tot * k) / 2)
+    for i in ims:
+        i2 = i.resize((max(1, int(i.width * k)), max(1, int(i.height * k))), Image.LANCZOS); sh.alpha_composite(i2, (x, 750 - i2.height)); x += i2.width + int(gap * k)
+    return sh
+
 def photo_inset(sheet, w=520):
     """Khung ảnh gỗ chứa tranh gia đình (không có chữ)."""
-    fam = Image.open(NV + sheet).convert('RGBA'); fam = fam.crop(fam.getbbox()) if fam.getbbox() else fam
+    fam = sheet.convert('RGBA') if isinstance(sheet, Image.Image) else Image.open(NV + sheet).convert('RGBA'); fam = fam.crop(fam.getbbox()) if fam.getbbox() else fam
     h = int(w * 0.62); fr = Image.new('RGBA', (w, h), (0, 0, 0, 0)); d = ImageDraw.Draw(fr)
     d.rounded_rectangle([0, 0, w - 1, h - 1], 18, fill=(150, 98, 52, 255), outline=(92, 58, 28, 255), width=5)
     d.rectangle([20, 20, w - 21, h - 21], fill=(255, 252, 244, 255), outline=(92, 58, 28, 255), width=3)
@@ -73,8 +87,13 @@ def photo_inset(sheet, w=520):
 def pic(ref):
     """ref: khoá tranh | 'new:x' | 'nv:x' | 'photo:bong' | 'rc:<kind>:<khoá tranh>' -> ảnh RGBA hoặc (ảnh, đã là khung)"""
     if isinstance(ref, Image.Image): return ref
-    if ref.startswith('new:'): return Image.open(NEW + ref[4:] + '.webp').convert('RGBA')
+    if ref.startswith('new:'):
+        im = Image.open(NEW + ref[4:] + '.webp').convert('RGBA')
+        if ref.startswith('new:leo_') and 'winter' not in ref:     # icon cảm xúc: đệm vuông để không bị cắt
+            m = max(im.size); sq = Image.new('RGBA', (m, m), (0, 0, 0, 0)); sq.alpha_composite(im, ((m - im.width) // 2, (m - im.height) // 2)); im = sq
+        return im
     if ref.startswith('nv:'): return Image.open(NV + ref[3:] + '.webp').convert('RGBA')
+    if ref == 'photo:ten': return photo_inset(ten_sheet())
     if ref.startswith('photo:'): return photo_inset('bang_fam_' + ref[6:] + '.webp')
     if ref.startswith('rc:'):
         _, kind, key = ref.split(':'); return recolor(Image.open(PIC + key + '.webp'), kind)
@@ -97,7 +116,7 @@ def person(w, h, night=False):
     hh = max(1, int(h * base * sc)); im = im.resize((max(1, int(im.width * hh / im.height)), hh), Image.LANCZOS)
     return tint(im, (0.78, 0.82, 1.0)) if night else im
 
-def scene(out, bg, ppl, items, night=False, props=()):
+def scene(out, bg, ppl, items, night=False, props=(), cards=()):
     base = Image.open(TRG + bg + '.webp').convert('RGBA').resize((900, 900))
     if night: base = tint(base, (0.36, 0.44, 0.78))
     n = len(ppl)
@@ -110,9 +129,12 @@ def scene(out, bg, ppl, items, night=False, props=()):
         if isinstance(f, str) and f.startswith('photo:'):
             c = c.resize((int(c.width * (sz + 140) / c.width), int(c.height * (sz + 140) / c.width)), Image.LANCZOS)
         x = (900 - c.width) // 2 if len(items) == 1 else (180 + j * 330); base.alpha_composite(c, (x, 40 if ppl else 250))
-    for (ref, x, hgt) in props:      # vật đặt dưới đất / chồng lên: (tham chiếu, tâm x, cao)
+    for (ref, sz, x, y) in cards:    # thẻ đặt tay: (tham chiếu, cỡ, x trái, y trên)
+        base.alpha_composite(card_img(pic(ref), sz), (x, y))
+    for pr in props:      # vật đặt dưới đất / chồng lên: (tham chiếu, tâm x, cao[, đáy y])
+        ref, x, hgt = pr[:3]; yb = pr[3] if len(pr) > 3 else 885
         im = pic(ref); im = im.resize((max(1, int(im.width * hgt / im.height)), hgt), Image.LANCZOS)
-        base.alpha_composite(im, (max(0, min(900 - im.width, x - im.width // 2)), 885 - im.height))
+        base.alpha_composite(im, (max(0, min(900 - im.width, x - im.width // 2)), yb - im.height))
     os.makedirs(os.path.dirname(out), exist_ok=True); base.convert('RGB').save(out, quality=84)
 
 def named(text, parent):
@@ -165,7 +187,7 @@ FIX = {
     'u5/p2_4': dict(ppl=['leo', 'ba'], items=['new:dog_sit']),
     'u5/p4_1': dict(ppl=['leo'], items=['new:dog_sit']),
     'u5/p4_2': dict(ppl=['bong', 'leo'], items=['new:dog_jump']),
-    'u5/p5_5': dict(ppl=['leo'], items=['table'], props=[('nv:pets_meo_dung_a', 450, 200)]),
+    'u5/p5_5': dict(ppl=['leo'], items=[], cards=[('table', 300, 540, 330)], props=[('nv:pets_meo_dung_a', 700, 190, 430)]),
     'u5/p5_6': dict(ppl=['leo'], items=['water'], props=[('nv:pets_meo_dung_a', 700, 230)]),
     'u5/p6_1': dict(ppl=['leo'], items=['sleepy'], night=True),
     'u5/p6_5': dict(ppl=['leo'], items=[], night=True),
@@ -180,11 +202,14 @@ FIX = {
     'u11/p4_4': dict(items=['rc:white:shorts']), 'u11/p4_6': dict(items=['rc:white:shorts']),
     'u11/p5_2': dict(items=['rc:pink:skirt', 'sock']), 'u11/p5_5': dict(items=['rc:pink:skirt']),
     'u11/p6_1': dict(items=['rc:gold:glasses']), 'u11/p6_2': dict(items=['rc:gold:glasses']), 'u11/p6_6': dict(items=['rc:gold:glasses']),
-    'u12/p6_5': dict(ppl=['leo', 'ba'], items=['photo:leo']),
-    'u12/p6_6': dict(ppl=['leo', 'ba'], items=['photo:leo', 'ten']),
+    'u12/p6_5': dict(ppl=['leo', 'ba'], items=['photo:ten']),
+    'u5/p1_1': dict(items=['new:leo_sleepy', 'bed']), 'u5/p1_3': dict(items=['new:leo_sleepy']),
+    'u5/p1_5': dict(items=['new:leo_excited']), 'u5/p5_1': dict(items=['new:leo_thirsty', 'cake']),
+    'u12/p6_6': dict(ppl=['leo', 'ba'], items=['photo:ten', 'ten']),
 }
 for k in ('p5_1', 'p5_2', 'p5_3', 'p5_4', 'p5_5', 'p5_6', 'p6_1', 'p6_2', 'p6_3'):
-    FIX.setdefault('u10/' + k, {})['bg'] = 'ls_park_snow'
+    FIX.setdefault('u10/' + k, {}).update(bg='ls_park_snow', winter=True)
+FIX['u10/p6_2'].update(ppl=['leo', 'anna'], items=['sunny'])
 
 def run(ids):
     done = []
@@ -214,7 +239,9 @@ def run(ids):
         if 'ppl' not in f and not ppl and not items:
             spk = [x[0] for x in P if x[0] not in ('narr', 'kids')]; ppl = spk[:1] or ['bong']
         # đổi màu cho cảnh tự suy: khoá tranh shorts/skirt/glasses được thay bằng bản đổi màu
-        scene(T + f'canh/{sid}.webp', f.get('bg', bgs[k]), ppl, items, f.get('night', False), f.get('props', ()))
+        if f.get('winter'):   # cảnh tuyết: Leo và mẹ Leo mặc đồ đông
+            ppl = [('new:leo_winter', 1.0) if x == 'leo' else (('new:me_leo_winter', 1.25) if x == 'me_leo' else x) for x in ppl]
+        scene(T + f'canh/{sid}.webp', f.get('bg', bgs[k]), ppl, items, f.get('night', False), f.get('props', ()), f.get('cards', ()))
         done.append(sid)
     return done
 
