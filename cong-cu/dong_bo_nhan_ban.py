@@ -23,6 +23,11 @@ NHAN_BAN = [
 ]
 
 
+# Thư mục RIÊNG của nhân bản, không có ở gốc: công cụ lấy bài của kho đó có thể xoá chúng, nên khôi phục sau khi chép
+GIU_RIENG = {'cuoc-thi': ['xem-truoc/tai-nguyen/qua'],      # phòng đổi quà của cuộc thi
+             'tu-hoc': []}
+
+
 def run(cmd, cwd):
     print('$', ' '.join(cmd), '   (trong', cwd + ')')
     return subprocess.run(cmd, cwd=cwd).returncode
@@ -51,6 +56,10 @@ def main():
             print(f'  CHƯA CLONE: git clone --depth 1 https://github.com/{repo} {d}'); ok = False; continue
         c = [x.replace('{nguon}', GOC) for x in cmd] + (['--thu'] if a.thu else [])
         if run(c, d): ok = False; continue
+        if not a.thu:
+            for rp in GIU_RIENG.get(ten, []):
+                subprocess.run(['git', 'checkout', '--', rp], cwd=d, capture_output=True)
+                print('  giữ nguyên thư mục riêng:', rp)
         if not a.thu: ok &= kiem_cu_phap(d)
     print('\nXong. Việc tiếp theo: mở trang thử bằng trình duyệt, rồi commit và đẩy từng kho nhân bản.' if not a.thu else '\n(--thu: chưa ghi gì)')
     sys.exit(0 if ok else 1)
